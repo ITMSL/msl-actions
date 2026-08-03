@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Skripte testen
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Versionsberechnung testen
+        run: bash .github/actions/next-version/next-version.test.sh
+      - name: Flyway-Guard testen
+        run: bash .github/actions/flyway-guard/flyway-guard.test.sh
+      - name: Flyway-Guard Leer-Tag-Pruefung testen
+        run: bash .github/actions/flyway-guard/pruefe-leere-tagliste.test.sh

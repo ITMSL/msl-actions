@@ -1,0 +1,42 @@
+name: 'Flyway-Rollback-Guard'
+description: 'Prueft geaenderte Flyway-Migrationen auf rollback-unsichere Statements.'
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        # */db/migration/*.sql -> Dienste mit Flyway (Java, Postgres).
+        # migrations/*.sql     -> ein Dienst mit eigenem, schlankem
+        # Migrationslaeufer (SQLite); dessen Health-Check vertraut darauf, dass
+        # eine vorauseilende DB additiv ist -- verdient also denselben Guard.
+        # */db/changelog/*.xml -> ein Dienst mit Liquibase statt Flyway; das
+        # SQL-Muster im Skript greift bewusst auch hier, weil Liquibase-Changelogs
+        # rohes SQL in <sql>-Tags einbetten koennen.
+        #
+        # Diff-Basis haengt vom Ausloeser ab. Bei einer PR gibt es einen
+        # Merge-Ziel-Branch, dagegen ist origin/<default>...HEAD sinnvoll.
+        # Bei einem Direktpush auf den Default-Branch ist HEAD aber bereits
+        # der Default-Branch -- der Bereich waere leer und der Guard griffe
+        # nie. Direktpushes sind hier der Normalfall (kein PR-Zwang), also
+        # ist die Basis dafuer der letzte gesetzte CalVer-Tag: alles, was
+        # seit dem letzten Release an Migrationen dazukam.
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          basis="origin/${{ github.event.repository.default_branch }}"
+        else
+          basis="$(git tag -l '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]-*' | sort -V | tail -1)"
+          if [ -z "$basis" ]; then
+            # Ausgelagert und einzeln getestet (pruefe-leere-tagliste.test.sh):
+            # eine leere lokale Tag-Liste ist nur dann "erster Release", wenn
+            # der Remote wirklich keine CalVer-Tags hat -- sonst haette z.B.
+            # ein fehlendes 'fetch-tags: true' im aufrufenden Checkout-Schritt
+            # den Guard still und unauffaellig gruen uebersprungen.
+            bash "${{ github.action_path }}/pruefe-leere-tagliste.sh"
+            exit 0
+          fi
+        fi
+        echo "Diff-Basis: $basis"
+        dateien="$(git diff --name-only "${basis}...HEAD" \
+                   -- '*/db/migration/*.sql' 'migrations/*.sql' '*/db/changelog/*.xml' || true)"
+        [ -z "$dateien" ] && { echo "Keine Migrationen geaendert."; exit 0; }
+        bash "${{ github.action_path }}/flyway-guard.sh" $dateien

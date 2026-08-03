@@ -1,0 +1,44 @@
+name: 'Git-Tags und GitHub-Release'
+description: 'Setzt den CalVer-Tag, bei Bedarf den SemVer-Tag, und legt das Release an.'
+
+inputs:
+  calver:
+    description: 'Technische Version, z.B. 2026.08.02-1'
+    required: true
+  semver:
+    description: 'Offizielle Version, z.B. 1.4.2'
+    required: true
+  semver_changed:
+    description: 'true, wenn der SemVer-Tag gesetzt werden soll'
+    required: true
+  token:
+    description: 'Token fuer gh release create'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        CALVER: ${{ inputs.calver }}
+        SEMVER: ${{ inputs.semver }}
+        SEMVER_CHANGED: ${{ inputs.semver_changed }}
+        # Explizit der Commit, fuer den dieser Workflow-Lauf ausgeloest wurde --
+        # nicht der lokale HEAD des Checkouts. Vorherige Steps im selben Job
+        # (z.B. ein Badge-Commit) koennen den lokalen HEAD weiterschieben;
+        # git tag ohne Commit-Angabe wuerde dann den falschen Commit taggen.
+        TARGET_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -a "$CALVER" -m "Release $CALVER" "$TARGET_SHA"
+        git push origin "$CALVER"
+        titel="$CALVER"
+        if [ "$SEMVER_CHANGED" = "true" ]; then
+          git tag -a "v$SEMVER" -m "Release v$SEMVER ($CALVER)" "$TARGET_SHA"
+          git push origin "v$SEMVER"
+          titel="v$SEMVER — $CALVER"
+        fi
+        gh release create "$CALVER" --title "$titel" --generate-notes --target "$TARGET_SHA"

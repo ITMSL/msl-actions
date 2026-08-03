@@ -1,0 +1,31 @@
+name: 'Naechste Version bestimmen'
+description: 'Berechnet CalVer und SemVer aus der Git-Historie des aufrufenden Repos.'
+
+inputs:
+  major:
+    description: 'true erzwingt einen Major-Bump, unabhaengig von den Commits.'
+    required: false
+    default: 'false'
+
+outputs:
+  calver:
+    description: 'Technische Version, z.B. 2026.08.02-1'
+    value: ${{ steps.berechnen.outputs.calver }}
+  semver:
+    description: 'Offizielle Version, z.B. 1.4.2'
+    value: ${{ steps.berechnen.outputs.semver }}
+  semver_changed:
+    description: 'true, wenn sich die offizielle Version geaendert hat'
+    value: ${{ steps.berechnen.outputs.semver_changed }}
+  prev_semver:
+    description: 'Vorheriger SemVer-Tag, leer wenn es keinen gab'
+    value: ${{ steps.berechnen.outputs.prev_semver }}
+
+runs:
+  using: composite
+  steps:
+    - id: berechnen
+      shell: bash
+      env:
+        MAJOR_BUMP: ${{ inputs.major }}
+      run: bash "${{ github.action_path }}/next-version.sh"
