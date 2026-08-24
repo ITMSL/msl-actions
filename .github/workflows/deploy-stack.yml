@@ -91,6 +91,8 @@ jobs:
             calver="$(git tag --points-at "$commit" \
                       | grep -E '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]+$' | head -1 || true)"
           else
+            git rev-parse --verify --quiet "$ZIEL^{commit}" > /dev/null \
+              || { echo "Zielversion '$ZIEL' nicht gefunden -- Tippfehler?"; exit 1; }
             commit="$(git rev-list -n1 "$ZIEL")"
             calver="$ZIEL"
           fi
