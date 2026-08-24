@@ -27,7 +27,7 @@ tag_anlegen() {
   # faengt das nicht ab (kein stderr), ein reiner `-n`-Output-Check
   # haelt den 404-Fehler faelschlich fuer eine vorhandene SHA
   # (realer Vorfall: msl-e2e-testsuite Release-Run auf 0fb58b8,
-  # 2026-08-24 -- Details Task-3-Report, Szenario in release-tags.test.sh).
+  # 2026-08-24 -- reproduziert als Szenario in release-tags.test.sh).
   local vorhandener
   if vorhandener="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${name}" \
     --jq '.object.sha' 2>/dev/null)"; then
