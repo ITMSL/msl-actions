@@ -45,16 +45,23 @@ runs:
           # Idempotenz fuer Re-Runs: existiert der Tag schon und zeigt auf
           # denselben Commit, ist nichts zu tun; zeigt er woanders hin, ist
           # das ein echter Konflikt und der Lauf muss rot werden.
+          # Existenz ueber den EXIT-CODE von `gh api` pruefen, nicht ueber
+          # den Output: bei 404 schreibt `gh api --jq` den rohen Fehler-
+          # JSON-Body auf stdout statt still zu scheitern -- 2>/dev/null
+          # faengt das nicht ab (kein stderr), ein reiner `-n`-Output-Check
+          # haelt den 404-Fehler faelschlich fuer eine vorhandene SHA
+          # (realer Vorfall: msl-e2e-testsuite Release-Run auf 0fb58b8,
+          # 2026-08-24 -- Details Task-3-Report).
           local vorhandener
-          vorhandener="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${name}" \
-            --jq '.object.sha' 2>/dev/null || true)"
-          if [ -n "$vorhandener" ]; then
+          if vorhandener="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${name}" \
+            --jq '.object.sha' 2>/dev/null)"; then
             # Annotierte Tags: Ref zeigt auf das Tag-Objekt -> dessen Ziel aufloesen.
             local ziel="$vorhandener"
             local objekt_typ
-            objekt_typ="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${vorhandener}" \
-              --jq '.object.sha' 2>/dev/null || true)"
-            [ -n "$objekt_typ" ] && ziel="$objekt_typ"
+            if objekt_typ="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${vorhandener}" \
+              --jq '.object.sha' 2>/dev/null)"; then
+              ziel="$objekt_typ"
+            fi
             if [ "$ziel" = "$TARGET_SHA" ]; then
               echo "Tag ${name} existiert bereits auf ${TARGET_SHA} -- uebersprungen."
               return 0
