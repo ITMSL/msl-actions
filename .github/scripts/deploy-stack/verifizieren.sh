@@ -25,6 +25,11 @@ for i in $(seq 1 "$VERSUCHE"); do
     if [ -n "${PUBLIC_HEALTHZ_URL:-}" ]; then
       body="$($CURL_CMD -sf "$PUBLIC_HEALTHZ_URL" 2>/dev/null || true)"
       voraus="$(printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("ja" if d.get("schemaVoraus") else "nein")' 2>/dev/null || echo unbekannt)"
+      # IMMER schreiben, auch bei "nein"/"unbekannt": sonst ist eine
+      # vertippte oder nicht durchgereichte PUBLIC_HEALTHZ_URL (curl liefert
+      # nie einen Koerper -> voraus=unbekannt) von einem echten "nein"
+      # ununterscheidbar -- beides blieb bisher gleich stumm.
+      echo "**schemaVoraus:** $voraus" >> "$SUMMARY"
       if [ "$voraus" = "ja" ]; then
         {
           echo ""

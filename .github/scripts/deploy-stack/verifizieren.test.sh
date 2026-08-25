@@ -79,7 +79,7 @@ STACK=demo CALVER=2026.08.25-1 SOLL=abc123 ALT="" \
 pruefe "exit" "1" "$exit"
 pruefe "kein Rollback-Ziel ermittelbar" "1" "$(grep -c 'kein Rollback-Ziel ermittelbar' "$SUMMARY")"
 
-echo "Fall 4: Erfolg + PUBLIC_HEALTHZ_URL mit schemaVoraus -> Summary warnt"
+echo "Fall 4: Erfolg + PUBLIC_HEALTHZ_URL mit schemaVoraus -> Summary warnt + schemaVoraus:ja"
 STUB=$(ssh_stub_ab_versuch 1 "$ERFOLG_JSON" "$FEHL_JSON")
 CURL=$(curl_stub '{"status":"ok","schemaVoraus":true}')
 SUMMARY=$(mktemp)
@@ -88,46 +88,67 @@ STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
   SLEEP_S=0 VERSUCHE=3 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
 pruefe "exit"                   "0" "$exit"
 pruefe "Schema liegt vor"       "1" "$(grep -c 'Schema liegt vor der Anwendung' "$SUMMARY")"
+pruefe "schemaVoraus: ja"       "1" "$(grep -c '\*\*schemaVoraus:\*\* ja' "$SUMMARY")"
 
-echo "Fall 5: Erfolg + CURL liefert kein JSON -> Exit 0 (best-effort), keine Schema-Warnung"
+echo "Fall 5: Erfolg + gueltiges nein-JSON -> keine Warnung, aber schemaVoraus:nein sichtbar"
+STUB=$(ssh_stub_ab_versuch 1 "$ERFOLG_JSON" "$FEHL_JSON")
+CURL=$(curl_stub '{"status":"ok","schemaVoraus":false}')
+SUMMARY=$(mktemp)
+STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
+  PUBLIC_HEALTHZ_URL=https://example.invalid/healthz CURL_CMD="bash $CURL" \
+  SLEEP_S=0 VERSUCHE=3 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
+pruefe "exit"                 "0" "$exit"
+pruefe "keine Schema-Warnung" "0" "$(grep -c 'Schema liegt vor' "$SUMMARY")"
+pruefe "schemaVoraus: nein"   "1" "$(grep -c '\*\*schemaVoraus:\*\* nein' "$SUMMARY")"
+
+echo "Fall 6: Erfolg + CURL liefert kein JSON -> Exit 0 (best-effort), schemaVoraus:unbekannt sichtbar (I-3: vertippte/nicht durchgereichte URL faellt jetzt auf statt stumm zu bleiben)"
 STUB=$(ssh_stub_ab_versuch 1 "$ERFOLG_JSON" "$FEHL_JSON")
 CURL=$(curl_stub 'kein json hier')
 SUMMARY=$(mktemp)
 STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
   PUBLIC_HEALTHZ_URL=https://example.invalid/healthz CURL_CMD="bash $CURL" \
   SLEEP_S=0 VERSUCHE=3 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
-pruefe "exit"             "0" "$exit"
-pruefe "keine Schema-Warnung" "0" "$(grep -c 'Schema liegt vor' "$SUMMARY")"
+pruefe "exit"                  "0" "$exit"
+pruefe "keine Schema-Warnung"  "0" "$(grep -c 'Schema liegt vor' "$SUMMARY")"
+pruefe "schemaVoraus: unbekannt" "1" "$(grep -c '\*\*schemaVoraus:\*\* unbekannt' "$SUMMARY")"
 
-# Fall 6-8: die Dreifachbedingung (rev/health/app) muss echt UND-verknuepft
+echo "Fall 7: Erfolg OHNE PUBLIC_HEALTHZ_URL -> Summary enthaelt kein schemaVoraus ueberhaupt"
+STUB=$(ssh_stub_ab_versuch 1 "$ERFOLG_JSON" "$FEHL_JSON")
+SUMMARY=$(mktemp)
+STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
+  SLEEP_S=0 VERSUCHE=3 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
+pruefe "exit"            "0" "$exit"
+pruefe "kein schemaVoraus" "0" "$(grep -c 'schemaVoraus' "$SUMMARY")"
+
+# Fall 8-10: die Dreifachbedingung (rev/health/app) muss echt UND-verknuepft
 # sein -- je genau EINE Bedingung verletzt, die anderen beiden korrekt. Ohne
 # diese Faelle blieben die Tests gruen, auch wenn eine der drei Pruefungen
 # aus dem Skript entfernt wuerde (belegt per Mutationstest im Fix-Report).
-echo "Fall 6: app_health verletzt (rev+health korrekt) -> Exit 1"
+echo "Fall 8: app_health verletzt (rev+health korrekt) -> Exit 1"
 STUB=$(ssh_stub_konstant '{"revision":"abc123","health":"running","app_health":"down"}')
 SUMMARY=$(mktemp)
 STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
   SLEEP_S=0 VERSUCHE=1 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
 pruefe "exit" "1" "$exit"
 
-echo "Fall 7: revision verletzt (health+app korrekt) -> Exit 1"
+echo "Fall 9: revision verletzt (health+app korrekt) -> Exit 1"
 STUB=$(ssh_stub_konstant '{"revision":"falsch","health":"running","app_health":"up"}')
 SUMMARY=$(mktemp)
 STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
   SLEEP_S=0 VERSUCHE=1 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
 pruefe "exit" "1" "$exit"
 
-echo "Fall 8: health verletzt (rev+app korrekt) -> Exit 1"
+echo "Fall 10: health verletzt (rev+app korrekt) -> Exit 1"
 STUB=$(ssh_stub_konstant '{"revision":"abc123","health":"exited","app_health":"up"}')
 SUMMARY=$(mktemp)
 STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
   SLEEP_S=0 VERSUCHE=1 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
 pruefe "exit" "1" "$exit"
 
-# Fall 9: Defaults VERSUCHE=18/SLEEP_S=5 statisch abgesichert -- ein
+# Fall 11: Defaults VERSUCHE=18/SLEEP_S=5 statisch abgesichert -- ein
 # Laufzeit-Test mit dem echten Default waere 18x5s=90s pro Testlauf und
 # damit zu langsam fuer diese Suite (bewusste Wahl, siehe Fix-Report).
-echo "Fall 9: Default-Zeilen fuer VERSUCHE/SLEEP_S vorhanden"
+echo "Fall 11: Default-Zeilen fuer VERSUCHE/SLEEP_S vorhanden"
 # Die einfachen Anfuehrungszeichen sind hier Absicht: grep -F sucht die
 # literale Skript-Zeile INKLUSIVE der "${...}"-Zeichen, keine Bash-Expansion.
 # shellcheck disable=SC2016
