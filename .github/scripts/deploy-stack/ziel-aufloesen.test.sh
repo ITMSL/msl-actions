@@ -70,6 +70,15 @@ ausgabe=$(cd "$R" && ZIEL=$'1.2.3\nboese' bash "$SKRIPT" 2>&1); exit=$?
 pruefe "exit"          "1" "$exit"
 pruefe "nicht gefunden" "1" "$(echo "$ausgabe" | grep -c 'nicht gefunden')"
 
+echo "Fall 6: \$GITHUB_OUTPUT wird mit calver= und commit= befuellt"
+R=$(neues_repo)
+git -C "$R" tag "2026.08.25-1"
+SHA="$(git -C "$R" rev-parse HEAD)"
+GHOUT=$(mktemp)
+(cd "$R" && ZIEL="2026.08.25-1" GITHUB_OUTPUT="$GHOUT" bash "$SKRIPT" >/dev/null)
+pruefe "GITHUB_OUTPUT calver" "1" "$(grep -c "^calver=2026.08.25-1\$" "$GHOUT")"
+pruefe "GITHUB_OUTPUT commit" "1" "$(grep -c "^commit=$SHA\$" "$GHOUT")"
+
 echo
 if [ "$FEHLER" -eq 0 ]; then echo "Alle Faelle bestanden."; else echo "$FEHLER Fehlschlag/Fehlschlaege."; fi
 exit "$FEHLER"

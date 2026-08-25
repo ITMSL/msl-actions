@@ -72,6 +72,16 @@ pruefe "exit" "0" "$exit"
 pruefe "alt leer" "" "$(wert "$A" alt)"
 pruefe "kein Rollback" "0" "$(grep -c 'Rollback' "$SUMMARY")"
 
+echo "Fall 4: \$GITHUB_OUTPUT wird mit alt= befuellt"
+R=$(neues_repo)
+git -C "$R" tag "2026.08.25-1"
+STUB=$(ssh_stub '{"version":"2026.08.20-3"}')
+SUMMARY=$(mktemp)
+GHOUT=$(mktemp)
+(cd "$R" && STACK=demo ZIEL=2026.08.25-1 CALVER=2026.08.25-1 SSH_CMD="bash $STUB" \
+    GITHUB_STEP_SUMMARY="$SUMMARY" GITHUB_OUTPUT="$GHOUT" bash "$SKRIPT" >/dev/null)
+pruefe "GITHUB_OUTPUT alt" "1" "$(grep -c '^alt=2026.08.20-3$' "$GHOUT")"
+
 echo
 if [ "$FEHLER" -eq 0 ]; then echo "Alle Faelle bestanden."; else echo "$FEHLER Fehlschlag/Fehlschlaege."; fi
 exit "$FEHLER"
