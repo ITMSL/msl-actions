@@ -25,3 +25,9 @@ jobs:
         run: bash .github/actions/flyway-guard/pruefe-leere-tagliste.test.sh
       - name: Release-Tags testen
         run: bash .github/actions/release-tags/release-tags.test.sh
+      - name: Deploy-Stack Zielaufloesung testen
+        run: bash .github/scripts/deploy-stack/ziel-aufloesen.test.sh
+      - name: Deploy-Stack Vorschau testen
+        run: bash .github/scripts/deploy-stack/vorschau.test.sh
+      - name: Deploy-Stack Verifikation testen
+        run: bash .github/scripts/deploy-stack/verifizieren.test.sh
