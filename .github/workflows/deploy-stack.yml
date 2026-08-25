@@ -67,7 +67,7 @@ jobs:
           GATE: ${{ inputs.gate_bestaetigung }}
         run: |
           set -euo pipefail
-          [ -n "$(echo "$GATE" | xargs)" ] || { echo "gate_bestaetigung fehlt -- Deploy ohne Gate-Beleg"; exit 1; }
+          [ -n "${GATE//[[:space:]]/}" ] || { echo "gate_bestaetigung fehlt -- Deploy ohne Gate-Beleg"; exit 1; }
           echo "**Gate-Beleg:** $GATE" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/checkout@v7
