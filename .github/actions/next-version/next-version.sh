@@ -25,7 +25,7 @@ max="$(git tag -l "${datum}-*" \
   | sed "s/^${datum}-//" \
   | grep -E '^[0-9]+$' \
   | sort -n | tail -1 || true)"
-calver="${datum}-$(( ${max:-0} + 1 ))"
+calver="${datum}-$(( 10#${max:-0} + 1 ))"
 
 prev="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -1 || true)"
 
@@ -53,9 +53,9 @@ else
 
   IFS=. read -r ma mi pa <<<"${prev#v}"
   case "$art" in
-    major) semver="$((ma+1)).0.0";        changed="true"  ;;
-    minor) semver="${ma}.$((mi+1)).0";    changed="true"  ;;
-    patch) semver="${ma}.${mi}.$((pa+1))";changed="true"  ;;
+    major) semver="$(( 10#$ma + 1 )).0.0";        changed="true"  ;;
+    minor) semver="${ma}.$(( 10#$mi + 1 )).0";    changed="true"  ;;
+    patch) semver="${ma}.${mi}.$(( 10#$pa + 1 ))";changed="true"  ;;
     *)     semver="${prev#v}";            changed="false" ;;
   esac
 fi

@@ -105,6 +105,17 @@ git -C "$R" tag -d "$HEUTE-1" >/dev/null   # lokal wieder unsichtbar machen
 A=$(cd "$R" && bash "$SKRIPT")
 pruefe "calver" "$HEUTE-2" "$(wert "$A" calver)"
 
+echo "Fall 12: fuehrende Null in CalVer-Tagesnummer crasht nicht"
+R=$(neues_repo); git -C "$R" tag "$HEUTE-08"
+A=$(cd "$R" && bash "$SKRIPT")
+pruefe "calver" "$HEUTE-9" "$(wert "$A" calver)"
+
+echo "Fall 13: fuehrende Null in SemVer-Komponente crasht nicht"
+R=$(neues_repo); git -C "$R" tag -a v1.0.08 -m v1.0.08
+commit "$R" "fix(x): kleinigkeit"
+A=$(cd "$R" && bash "$SKRIPT")
+pruefe "semver" "1.0.9" "$(wert "$A" semver)"
+
 echo
 if [ "$FEHLER" -eq 0 ]; then echo "Alle Faelle bestanden."; else echo "$FEHLER Fehlschlag/Fehlschlaege."; fi
 exit "$FEHLER"
