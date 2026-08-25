@@ -32,6 +32,14 @@ on:
         description: 'SSH-User, an den das erzwungene Deploy-Kommando gebunden ist.'
         required: true
         type: string
+      gate_bestaetigung:
+        description: >-
+          Pflicht-Beleg, dass das Staging-Gate fuer diesen Stand gefahren
+          wurde, z.B. "Kern 27/27, 2026-08-25". Reines Honor-System: erzwingt
+          die Spur im Run, nicht das Gate selbst (bewusste Grenze, siehe
+          msl-workspace docs/release-gate-staging.md).
+        required: true
+        type: string
     secrets:
       DEPLOY_SSH_KEY:
         required: true
@@ -54,10 +62,23 @@ jobs:
       SSH_PORT: ${{ inputs.ssh_port }}
       SSH_USER: ${{ inputs.ssh_user }}
     steps:
+      - name: Gate-Beleg pruefen
+        env:
+          GATE: ${{ inputs.gate_bestaetigung }}
+        run: |
+          set -euo pipefail
+          [ -n "$(echo "$GATE" | xargs)" ] || { echo "gate_bestaetigung fehlt -- Deploy ohne Gate-Beleg"; exit 1; }
+          echo "**Gate-Beleg:** $GATE" >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           fetch-tags: true
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ITMSL/msl-actions
+          path: .msl-actions
 
       - name: SSH vorbereiten
         run: |
@@ -73,66 +94,14 @@ jobs:
 
       - name: Zielversion aufloesen
         id: ziel
-        run: |
-          set -euo pipefail
-          # Technisch fuehrend ist immer die CalVer. Eine SemVer-Eingabe wird
-          # deshalb ueber ihren Git-Tag (v1.4.2) auf den Commit und von dort auf
-          # die CalVer desselben Commits abgebildet -- sonst entstuenden Staende
-          # ohne eindeutigen Namen im Protokoll.
-          # Bewusst bash-natives Matching statt `echo | grep -qE`: dort
-          # verankern ^ und $ nur zeilenweise, ein eingebetteter Zeilenumbruch
-          # in der Eingabe wuerde die Pruefung umgehen.
-          if [[ "$ZIEL" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            commit="$(git rev-list -n1 "v$ZIEL")"
-            # "|| true" ist Pflicht: unter pipefail reisst ein leerer grep-Treffer
-            # (kein CalVer-Tag auf diesem Commit) die Zuweisung sofort mit, set -e
-            # beendet den Schritt dann VOR der eigenen Fehlermeldung unten -- der
-            # Operator saehe nur eine Zeile ohne jede Ausgabe.
-            calver="$(git tag --points-at "$commit" \
-                      | grep -E '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]+$' | head -1 || true)"
-          else
-            git rev-parse --verify --quiet "$ZIEL^{commit}" > /dev/null \
-              || { echo "Zielversion '$ZIEL' nicht gefunden -- Tippfehler?"; exit 1; }
-            commit="$(git rev-list -n1 "$ZIEL")"
-            calver="$ZIEL"
-          fi
-          [ -n "$calver" ] || { echo "Keine CalVer zu '$ZIEL' gefunden"; exit 1; }
-          echo "calver=$calver" >> "$GITHUB_OUTPUT"
-          echo "commit=$commit" >> "$GITHUB_OUTPUT"
-          echo "Ziel: $ZIEL -> CalVer $calver (commit $commit)"
+        run: bash .msl-actions/.github/scripts/deploy-stack/ziel-aufloesen.sh
 
       - name: Vorschau
         id: vorschau
         env:
           CALVER: ${{ steps.ziel.outputs.calver }}
-        run: |
-          set -euo pipefail
-          ist="$(ssh -i ~/.ssh/deploy -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "get $STACK")"
-          echo "$ist"
-          alt="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))')"
-          echo "alt=$alt" >> "$GITHUB_OUTPUT"
-          {
-            echo "## Deploy $STACK"
-            echo ""
-            echo "| | Version |"
-            echo "|---|---|"
-            echo "| aktuell | \`$alt\` |"
-            echo "| Ziel | \`$CALVER\` (Eingabe: \`$ZIEL\`) |"
-            echo ""
-            if [ -n "$alt" ] && [ "$alt" != "$CALVER" ] && [ "$(printf '%s\n%s\n' "$alt" "$CALVER" | sort -V | head -1)" = "$CALVER" ]; then
-              echo "**Rueckwaertsschritt — das ist ein Rollback.**"
-              echo ""
-              # "$alt..$CALVER" ist bei einem Rueckwaertsschritt per Definition
-              # leer (Exit 0, keine Zeilen) -- der "|| echo"-Fallback greift
-              # nicht, der Abschnitt waere ausgerechnet hier stumm. Richtung
-              # umdrehen: das sind die Commits, die dieser Rollback zuruecknimmt.
-              echo "### Zurueckgenommene Aenderungen"
-              git log --oneline "$CALVER..$alt" 2>/dev/null || echo "(Bereich nicht ermittelbar)"
-            else
-              echo "### Aenderungen"
-              git log --oneline "$alt..$CALVER" 2>/dev/null || echo "(Bereich nicht ermittelbar)"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
+          SSH_CMD: ssh -i ~/.ssh/deploy -p ${{ inputs.ssh_port }} ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}
+        run: bash .msl-actions/.github/scripts/deploy-stack/vorschau.sh
 
       - name: Setzen
         run: |
@@ -144,49 +113,7 @@ jobs:
         env:
           CALVER: ${{ steps.ziel.outputs.calver }}
           SOLL: ${{ steps.ziel.outputs.commit }}
-        run: |
-          set -euo pipefail
-          soll="$SOLL"
-          for i in $(seq 1 18); do   # 18 x 5s = 90s
-            sleep 5
-            ist="$(ssh -i ~/.ssh/deploy -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "verify $STACK")"
-            rev="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision",""))')"
-            zst="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("health",""))')"
-            app="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("app_health",""))')"
-            # Drei Bedingungen: richtiger Commit, Container laeuft, Anwendung
-            # antwortet. "running" allein hiesse nur, dass der Prozess lebt.
-            if [ "$rev" = "$soll" ] && [ "$zst" = "running" ] && [ "$app" = "up" ]; then
-              echo "Verifiziert: revision=$rev health=$zst app=$app"
-              echo "**Verifiziert live:** \`$CALVER\` (revision \`$rev\`)" >> "$GITHUB_STEP_SUMMARY"
-              # Best-effort, nie fatal: nur Dienste mit einer oeffentlichen
-              # /healthz-URL (per Aufrufer-Input) liefern hier ueberhaupt einen
-              # Koerper zum Auslesen. Ein Fehlschlag hier darf einen sonst
-              # erfolgreichen Deploy nicht rot machen -- daher kein "set -e"-
-              # sensibler Aufruf ohne Absicherung.
-              URL="${{ inputs.public_healthz_url }}"
-              if [ -n "$URL" ]; then
-                body="$(curl -sf "$URL" 2>/dev/null || true)"
-                voraus="$(printf '%s' "$body" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("ja" if d.get("schemaVoraus") else "nein")' 2>/dev/null || echo unbekannt)"
-                if [ "$voraus" = "ja" ]; then
-                  {
-                    echo ""
-                    echo "**Achtung: Datenbank-Schema liegt vor der Anwendung** (\`schemaVoraus\`) — \`$body\`"
-                  } >> "$GITHUB_STEP_SUMMARY"
-                fi
-              fi
-              exit 0
-            fi
-            echo "Versuch $i: revision=$rev (soll $soll) health=$zst"
-          done
-          {
-            echo ""
-            echo "**Verifikation fehlgeschlagen.** Rollback:"
-            echo '```'
-            if [ -n "${{ steps.vorschau.outputs.alt }}" ]; then
-              echo "gh workflow run deploy.yml --repo ${{ github.repository }} -f version=${{ steps.vorschau.outputs.alt }}"
-            else
-              echo "(kein Rollback-Ziel ermittelbar -- 'alt' war leer, siehe Vorschau-Schritt oben)"
-            fi
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+          ALT: ${{ steps.vorschau.outputs.alt }}
+          PUBLIC_HEALTHZ_URL: ${{ inputs.public_healthz_url }}
+          SSH_CMD: ssh -i ~/.ssh/deploy -p ${{ inputs.ssh_port }} ${{ inputs.ssh_user }}@${{ inputs.ssh_host }}
+        run: bash .msl-actions/.github/scripts/deploy-stack/verifizieren.sh
