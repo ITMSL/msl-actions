@@ -73,6 +73,10 @@ release_sicherstellen() {
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
   set -euo pipefail
+  # CALVER (Grossbuchstaben) ist der dokumentierte Env-Kontrakt von aussen,
+  # calver (klein) ist ein davon unabhaengiger lokaler Parametername in den
+  # Funktionen oben -- keine Verwechslung.
+  # shellcheck disable=SC2153
   tag_anlegen "$CALVER" "Release $CALVER"
   titel="$CALVER"
   if [ "$SEMVER_CHANGED" = "true" ]; then

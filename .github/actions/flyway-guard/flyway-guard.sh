@@ -57,6 +57,10 @@ for datei in "$@"; do
   fi
   if treffer="$(grep -inE "$muster" "$datei")"; then
     echo "Rollback-unsicher: $datei"
+    # sed prefixt hier bewusst JEDE Zeile (grep kann mehrzeilig treffen);
+    # bash-natives ${var//pattern/replacement} kennt keine Zeilenanfaenge,
+    # waere hier keine Vereinfachung.
+    # shellcheck disable=SC2001
     echo "$treffer" | sed 's/^/    /'
     FEHLER=1
   fi

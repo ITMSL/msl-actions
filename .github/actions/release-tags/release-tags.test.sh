@@ -6,6 +6,11 @@
 # schreibt (KEINE Shell-Variable -- tag_anlegen()/release_sicherstellen()
 # werden teils per Command-Substitution `$(...)` aufgerufen, das laeuft in
 # einer Subshell, deren Variablenaenderungen nicht zurueckwirken).
+# Die gh()-Stub-Funktion unten wird nur INDIREKT aufgerufen, aus
+# tag_anlegen()/release_sicherstellen() in der gesourcten release-tags.sh
+# heraus. shellcheck analysiert diese Datei isoliert und haelt jede Zeile im
+# Stub-Rumpf faelschlich fuer unerreichbar -- Direktive gilt fuers ganze File.
+# shellcheck disable=SC2317
 set -uo pipefail
 HIER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKRIPT="$HIER/release-tags.sh"
@@ -19,7 +24,10 @@ pruefe() { # pruefe <name> <erwartet> <ist>
   fi
 }
 
+# $SKRIPT ist dynamisch, shellcheck kann die source-Direktive oben nicht
+# statisch nachvollziehen (kein -x-Lauf hier).
 # shellcheck source=release-tags.sh
+# shellcheck disable=SC1091
 source "$SKRIPT"
 
 export GITHUB_REPOSITORY="ITMSL/test-repo"
