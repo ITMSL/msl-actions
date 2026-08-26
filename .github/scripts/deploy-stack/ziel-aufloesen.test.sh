@@ -46,16 +46,17 @@ ausgabe=$(cd "$R" && ZIEL="kaputt" bash "$SKRIPT" 2>&1); exit=$?
 pruefe "exit"          "1" "$exit"
 pruefe "nicht gefunden" "1" "$(echo "$ausgabe" | grep -c 'nicht gefunden')"
 
-# Abweichung vom Brief: "9.9.9" ist semver-foermig und nimmt deshalb den
-# if-Zweig -- dort scheitert "git rev-list -n1 v9.9.9" (Tag existiert nicht)
-# direkt an git selbst (Exit 128, "fatal: ambiguous argument"), BEVOR die
-# Skript-eigene "nicht gefunden"-Meldung ueberhaupt erreicht wird. Die vom
-# Brief behauptete Gleichbehandlung mit "kaputt" (Exit 1 + "nicht gefunden")
-# gilt nur fuer den else-Zweig -- siehe Report.
-echo "Fall 3b: Unbekannte, semver-foermige Version -> scheitert an git selbst (nicht 0)"
+# Seit dem M4-Nachtrag (2026-08-26) nimmt auch der if-Zweig den Klartext-Pfad:
+# ein Existenz-Guard vor "git rev-list" faengt die semver-foermige
+# Nicht-Version, statt sie an gits "fatal: ambiguous argument" (Exit 128)
+# sterben zu lassen -- Exit 1 + "nicht gefunden", gleichbehandelt mit dem
+# else-Zweig (Fall 3).
+echo "Fall 3b: Unbekannte, semver-foermige Version -> Exit 1 + Klartext"
 R=$(neues_repo)
 ausgabe=$(cd "$R" && ZIEL="9.9.9" bash "$SKRIPT" 2>&1); exit=$?
-pruefe "exit != 0" "1" "$([ "$exit" -ne 0 ] && echo 1 || echo 0)"
+pruefe "exit 1"          "1" "$exit"
+pruefe "nicht gefunden"  "1" "$(echo "$ausgabe" | grep -c 'nicht gefunden')"
+pruefe "kein git-Fatal"  "0" "$(echo "$ausgabe" | grep -c 'fatal:')"
 
 echo "Fall 4: SemVer-Tag ohne CalVer-Tag -> Exit 1, 'Keine CalVer'"
 R=$(neues_repo)

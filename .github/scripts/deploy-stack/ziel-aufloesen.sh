@@ -8,6 +8,12 @@ set -euo pipefail
 # nur zeilenweise, ein eingebetteter Zeilenumbruch in der Eingabe wuerde die
 # Pruefung umgehen.
 if [[ "$ZIEL" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  # Existenz VOR rev-list pruefen (M4/Audit-Nachtrag 2026-08-26): ohne den
+  # Guard stirbt eine semver-foermige Nicht-Version an gits eigenem
+  # "fatal: ambiguous argument" (Exit 128) statt an der Klartext-Meldung --
+  # fail-closed war es schon, aber der Bediener sah nur einen git-Fatal.
+  git rev-parse --verify --quiet "refs/tags/v$ZIEL" > /dev/null \
+    || { echo "Zielversion '$ZIEL' nicht gefunden -- Tippfehler?"; exit 1; }
   commit="$(git rev-list -n1 "v$ZIEL")"
   # "|| true" ist Pflicht: unter pipefail reisst ein leerer grep-Treffer
   # (kein CalVer-Tag auf diesem Commit) die Zuweisung sofort mit.
