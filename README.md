@@ -9,6 +9,7 @@ eingebunden wird:
 
 - **`.github/actions/next-version`** — berechnet CalVer und SemVer aus der
   Git-Historie des aufrufenden Repos (Conventional-Commits-Auswertung).
+  Der CalVer-Kalendertag zählt in Berliner Zeit (CET/CEST), nicht UTC.
 - **`.github/actions/release-tags`** — setzt Git-Tags und legt das
   GitHub-Release für die berechnete Version an.
 - **`.github/actions/flyway-guard`** — prüft geänderte Datenbank-Migrationen

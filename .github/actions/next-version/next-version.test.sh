@@ -2,7 +2,8 @@
 # Tests fuer next-version.sh. Jeder Fall baut ein eigenes Wegwerf-Repo.
 set -uo pipefail
 SKRIPT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/next-version.sh"
-HEUTE="$(date -u +%Y.%m.%d)"
+# Kalendertag in Berliner Zeit -- dieselbe Regel wie im Skript.
+HEUTE="$(TZ="CET-1CEST,M3.5.0,M10.5.0/3" date +%Y.%m.%d)"
 FEHLER=0
 
 pruefe() { # pruefe <name> <erwartet> <ist>
@@ -115,6 +116,26 @@ R=$(neues_repo); git -C "$R" tag -a v1.0.08 -m v1.0.08
 commit "$R" "fix(x): kleinigkeit"
 A=$(cd "$R" && bash "$SKRIPT")
 pruefe "semver" "1.0.9" "$(wert "$A" semver)"
+
+echo "Fall 14: CalVer-Tag zaehlt in Berliner Zeit, nicht UTC (Sommerzeit)"
+# 2026-09-10T22:30:00Z ist in Berlin bereits der 11.09. (CEST = UTC+2).
+R=$(neues_repo); A=$(cd "$R" && CALVER_JETZT_EPOCH=1789079400 bash "$SKRIPT")
+pruefe "calver" "2026.09.11-1" "$(wert "$A" calver)"
+
+echo "Fall 15: CalVer-Tag zaehlt in Berliner Zeit, nicht UTC (Winterzeit)"
+# 2026-01-10T23:30:00Z ist in Berlin bereits der 11.01. (CET = UTC+1);
+# 2026-01-10T22:30:00Z ist dort noch der 10.01.
+R=$(neues_repo); A=$(cd "$R" && CALVER_JETZT_EPOCH=1768087800 bash "$SKRIPT")
+pruefe "calver nach Mitternacht Berlin" "2026.01.11-1" "$(wert "$A" calver)"
+A=$(cd "$R" && CALVER_JETZT_EPOCH=1768084200 bash "$SKRIPT")
+pruefe "calver vor Mitternacht Berlin"  "2026.01.10-1" "$(wert "$A" calver)"
+
+echo "Fall 16: Tagesnummer zaehlt gegen den Berliner Tag weiter"
+# Ein Tag vom Berliner 11.09. muss bei einem Lauf um 22:30Z (= 00:30 Berlin)
+# als "heute" erkannt werden -- sonst begaenne der zweite Lauf wieder bei -1.
+R=$(neues_repo); git -C "$R" tag -a "2026.09.11-1" -m t1
+A=$(cd "$R" && CALVER_JETZT_EPOCH=1789079400 bash "$SKRIPT")
+pruefe "calver" "2026.09.11-2" "$(wert "$A" calver)"
 
 echo
 if [ "$FEHLER" -eq 0 ]; then echo "Alle Faelle bestanden."; else echo "$FEHLER Fehlschlag/Fehlschlaege."; fi

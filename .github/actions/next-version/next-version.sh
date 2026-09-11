@@ -17,7 +17,22 @@ set -euo pipefail
 # kein Fehler, dann zaehlen die lokal gesetzten Tags weiter.
 git fetch --tags --force origin >/dev/null 2>&1 || true
 
-datum="$(date -u +%Y.%m.%d)"
+# Kalendertag in BERLINER Zeit, nicht UTC. Ein Release um 00:30 Berliner
+# Zeit traegt sonst das Datum des Vortags (UTC ist noch 22:30) -- der Tag
+# steht dann neben einem Vortags-Release, das inhaltlich ein anderer Tag ist
+# (Grenzfall LogistikOptimierer, Nacht auf den 2026-09-11). Die Zone steht
+# als POSIX-Regel und nicht als "Europe/Berlin": Namen brauchen tzdata, und
+# ohne tzdata (z.B. Git-Bash unter Windows) faellt date STILL auf UTC
+# zurueck. Die Regel (UTC+1, Sommerzeit letzter So. Maerz 02:00 bis letzter
+# So. Oktober 03:00) gilt ueberall, wo GNU date laeuft.
+# CALVER_JETZT_EPOCH (Epoch-Sekunden) friert den Zeitpunkt ein -- nur fuer
+# die Tests, im Betrieb ungesetzt.
+export TZ="CET-1CEST,M3.5.0,M10.5.0/3"
+if [ -n "${CALVER_JETZT_EPOCH:-}" ]; then
+  datum="$(date -d "@${CALVER_JETZT_EPOCH}" +%Y.%m.%d)"
+else
+  datum="$(date +%Y.%m.%d)"
+fi
 
 # Hoechste bereits vergebene Tagesnummer plus eins. Bewusst das Maximum statt
 # der Anzahl: ein geloeschter Tag wuerde sonst eine Nummer erneut vergeben.
