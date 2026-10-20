@@ -16,6 +16,22 @@
 # derkurier-testtwin Run 31819126945, 2026-08-14). Die REST-Ref-
 # Erstellung zeigt nur auf einen existierenden Commit und unterliegt
 # dieser Pruefung nicht.
+# Wiederholt mutierende GitHub-API-/CLI-Aufrufe bis zu 3-mal bei transienten
+# Netzfehlern / 5xx-Antworten (Backoff ueber GH_RETRY_SLEEP steuerbar).
+mit_retry() {
+  local versuch=1 max_versuche=3 Pause="${GH_RETRY_SLEEP:-1}"
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    if [ "$versuch" -ge "$max_versuche" ]; then
+      return 1
+    fi
+    sleep "$Pause"
+    versuch=$((versuch + 1))
+  done
+}
+
 tag_anlegen() {
   local name="$1" nachricht="$2"
   # Idempotenz fuer Re-Runs: existiert der Tag schon und zeigt auf
@@ -46,10 +62,10 @@ tag_anlegen() {
     return 1
   fi
   local tag_objekt
-  tag_objekt="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags" \
+  tag_objekt="$(mit_retry gh api "repos/${GITHUB_REPOSITORY}/git/tags" \
     -f tag="$name" -f message="$nachricht" \
-    -f object="$TARGET_SHA" -f type=commit --jq '.sha')"
-  gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+    -f object="$TARGET_SHA" -f type=commit --jq '.sha')" || return 1
+  mit_retry gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
     -f ref="refs/tags/${name}" -f sha="$tag_objekt" --jq '.ref'
 }
 
@@ -68,7 +84,7 @@ release_sicherstellen() {
     echo "FEHLER: Release ${calver} existiert und zeigt auf ${release_target} statt ${TARGET_SHA}." >&2
     return 1
   fi
-  gh release create "$calver" --title "$titel" --generate-notes --target "$TARGET_SHA"
+  mit_retry gh release create "$calver" --title "$titel" --generate-notes --target "$TARGET_SHA"
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

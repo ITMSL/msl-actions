@@ -44,7 +44,10 @@ zuruecksetzen() {
   STUB_RELEASE_EXISTS=false
   STUB_RELEASE_TARGET=""
   STUB_RELEASE_VIEW_DIRTY_STDOUT=false
+  STUB_TRANSIENT_FAIL_FIRST=false
 }
+
+export GH_RETRY_SLEEP=0
 
 # Stub fuer `gh`: bildet nur die vier Aufrufmuster nach, die release-tags.sh
 # tatsaechlich nutzt (Ref-Lookup, Tag-Objekt-Aufloesung, Tag-/Ref-Anlage,
@@ -72,10 +75,18 @@ gh() {
           return 1
           ;;
         */git/tags)
+          if [ "$STUB_TRANSIENT_FAIL_FIRST" = "true" ] && [ "$(grep -c 'CALL: api repos/ITMSL/test-repo/git/tags ' "$GH_LOG_FILE" || true)" -eq 1 ]; then
+            echo '{"message":"Server Error","status":"502"}' >&2
+            return 1
+          fi
           echo "neuesTagObjektSha"
           return 0
           ;;
         */git/refs)
+          if [ "$STUB_TRANSIENT_FAIL_FIRST" = "true" ] && [ "$(grep -c 'CALL: api repos/ITMSL/test-repo/git/refs ' "$GH_LOG_FILE" || true)" -eq 1 ]; then
+            echo '{"message":"Server Error","status":"503"}' >&2
+            return 1
+          fi
           echo "refs/tags/erstellt"
           return 0
           ;;
@@ -92,6 +103,10 @@ gh() {
           return 1
           ;;
         create)
+          if [ "$STUB_TRANSIENT_FAIL_FIRST" = "true" ] && [ "$(grep -c 'CALL: release create ' "$GH_LOG_FILE" || true)" -eq 1 ]; then
+            echo 'HTTP 502: Bad Gateway' >&2
+            return 1
+          fi
           return 0
           ;;
       esac
@@ -158,7 +173,7 @@ echo "Fall 8 (End-to-End, kein Sourcing): Skript direkt ausgefuehrt legt Tag+Rel
 zuruecksetzen
 export -f gh
 export STUB_REF_EXISTS STUB_REF_SHA STUB_REF_DIRTY_STDOUT STUB_TAGOBJ_RESOLVES STUB_TAGOBJ_SHA \
-  STUB_RELEASE_EXISTS STUB_RELEASE_TARGET STUB_RELEASE_VIEW_DIRTY_STDOUT
+  STUB_RELEASE_EXISTS STUB_RELEASE_TARGET STUB_RELEASE_VIEW_DIRTY_STDOUT STUB_TRANSIENT_FAIL_FIRST
 export GH_LOG_FILE
 ausgabe="$(CALVER="2026.01.01-1" SEMVER="1.0.0" SEMVER_CHANGED="false" \
   GITHUB_REPOSITORY="$GITHUB_REPOSITORY" TARGET_SHA="$TARGET_SHA" GH_TOKEN="dummy" \
@@ -166,6 +181,17 @@ ausgabe="$(CALVER="2026.01.01-1" SEMVER="1.0.0" SEMVER_CHANGED="false" \
 pruefe "exit"                       "0" "$exit"
 pruefe "create git/refs aufgerufen" "1" "$(grep -c 'CALL: api repos/ITMSL/test-repo/git/refs ' "$GH_LOG_FILE" || true)"
 pruefe "release create aufgerufen"  "1" "$(grep -c 'CALL: release create' "$GH_LOG_FILE" || true)"
+
+echo "Fall 9: Transiente 5xx-Fehler bei Tag-/Ref-/Release-Anlage werden per Retry abgefangen"
+zuruecksetzen
+STUB_TRANSIENT_FAIL_FIRST=true
+tag_anlegen "2026.01.01-1" "Release 2026.01.01-1" >/dev/null 2>&1; exit_tag=$?
+release_sicherstellen "2026.01.01-1" "2026.01.01-1" >/dev/null 2>&1; exit_rel=$?
+pruefe "tag_anlegen exit nach Retry"        "0" "$exit_tag"
+pruefe "release_sicherstellen exit Retry"   "0" "$exit_rel"
+pruefe "git/tags 2x aufgerufen"             "2" "$(grep -c 'CALL: api repos/ITMSL/test-repo/git/tags ' "$GH_LOG_FILE" || true)"
+pruefe "git/refs 2x aufgerufen"             "2" "$(grep -c 'CALL: api repos/ITMSL/test-repo/git/refs ' "$GH_LOG_FILE" || true)"
+pruefe "release create 2x aufgerufen"       "2" "$(grep -c 'CALL: release create ' "$GH_LOG_FILE" || true)"
 unset -f gh
 
 rm -f "$GH_LOG_FILE"
