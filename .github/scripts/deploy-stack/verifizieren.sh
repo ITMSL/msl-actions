@@ -11,10 +11,18 @@ SLEEP_S="${SLEEP_S:-5}"
 
 for i in $(seq 1 "$VERSUCHE"); do
   sleep "$SLEEP_S"
-  ist="$($SSH_CMD "verify $STACK")"
-  rev="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision",""))')"
-  zst="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("health",""))')"
-  app="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("app_health",""))')"
+  # Waehrend des Container-Austauschs scheitert verify gelegentlich (z. B.
+  # "no such object"): ein Fehlversuch bricht das Polling nicht ab.
+  fehler="$(mktemp)"
+  if ! ist="$($SSH_CMD "verify $STACK" 2>"$fehler")"; then
+    echo "Versuch $i: verify fehlgeschlagen ($(head -n 1 "$fehler"))"
+    rm -f "$fehler"
+    continue
+  fi
+  rm -f "$fehler"
+  rev="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("revision",""))' 2>/dev/null || true)"
+  zst="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("health",""))' 2>/dev/null || true)"
+  app="$(echo "$ist" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("app_health",""))' 2>/dev/null || true)"
   # Drei Bedingungen: richtiger Commit, Container laeuft, Anwendung antwortet.
   if [ "$rev" = "$SOLL" ] && [ "$zst" = "running" ] && [ "$app" = "up" ]; then
     echo "Verifiziert: revision=$rev health=$zst app=$app"

@@ -145,6 +145,58 @@ STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
   SLEEP_S=0 VERSUCHE=1 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
 pruefe "exit" "1" "$exit"
 
+# ssh_stub_skript <zaehler-bedingung-ab> <fehl-zeilen> -- bis Versuch n-1 endet
+# der Stub mit Exit 1 und der Meldung, ab n liefert er das Erfolgs-JSON.
+ssh_stub_exit1_dann() { # ssh_stub_exit1_dann <erfolg-ab-n> <erfolg-json> <meldung>
+  local ab="$1" erfolg="$2" meldung="$3"
+  local s; s="$(mktemp)"
+  local zaehler; zaehler="$(mktemp)"
+  echo 0 > "$zaehler"
+  cat > "$s" <<EOF
+#!/usr/bin/env bash
+n=\$(cat "$zaehler"); n=\$((n+1)); echo "\$n" > "$zaehler"
+if [ "\$n" -ge $ab ]; then
+  echo $(printf '%q' "$erfolg")
+  exit 0
+fi
+echo $(printf '%q' "$meldung") >&2
+exit 1
+EOF
+  chmod +x "$s"
+  echo "$s"
+}
+
+# Fall 12-14: ein einzelner fehlgeschlagener verify-Aufruf (Container-
+# Austausch: "no such object") darf die Polling-Schleife nicht abbrechen.
+echo "Fall 12: verify scheitert im 1. Versuch (Exit 1), 2. Versuch Erfolg -> Exit 0, Verifiziert"
+STUB=$(ssh_stub_exit1_dann 2 "$ERFOLG_JSON" "error: no such object: abc")
+SUMMARY=$(mktemp); AUSGABE=$(mktemp)
+STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
+  SLEEP_S=0 VERSUCHE=3 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >"$AUSGABE" 2>&1; exit=$?
+pruefe "exit"                  "0" "$exit"
+pruefe "Verifiziert"           "1" "$(grep -c '^Verifiziert:' "$AUSGABE")"
+pruefe "Versuch protokolliert" "1" "$(grep -c 'Versuch 1: verify fehlgeschlagen (error: no such object: abc)' "$AUSGABE")"
+
+echo "Fall 13: verify scheitert IMMER -> nach VERSUCHE Exit 1 mit Rollback-Hinweis"
+STUB=$(ssh_stub_exit1_dann 99 "$ERFOLG_JSON" "error: no such object: abc")
+SUMMARY=$(mktemp)
+STACK=demo CALVER=2026.08.25-1 SOLL=abc123 ALT=2026.08.20-3 \
+  GITHUB_REPOSITORY=ITMSL/demo SSH_CMD="bash $STUB" SLEEP_S=0 VERSUCHE=3 \
+  GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >/dev/null 2>&1; exit=$?
+pruefe "exit"            "1" "$exit"
+pruefe "gh workflow run" "1" "$(grep -c 'gh workflow run deploy.yml' "$SUMMARY")"
+pruefe "version aus ALT" "1" "$(grep -c -- '-f version=2026.08.20-3' "$SUMMARY")"
+
+echo "Fall 14: leere/kaputte JSON-Antwort im 1. Versuch -> kein Abbruch, Erfolg im 2."
+for KAPUTT in "" "kein json hier"; do
+  STUB=$(ssh_stub_ab_versuch 2 "$ERFOLG_JSON" "$KAPUTT")
+  SUMMARY=$(mktemp); AUSGABE=$(mktemp)
+  STACK=demo CALVER=2026.08.25-1 SOLL=abc123 SSH_CMD="bash $STUB" \
+    SLEEP_S=0 VERSUCHE=3 GITHUB_STEP_SUMMARY="$SUMMARY" bash "$SKRIPT" >"$AUSGABE" 2>&1; exit=$?
+  pruefe "exit (Antwort '$KAPUTT')"        "0" "$exit"
+  pruefe "Verifiziert (Antwort '$KAPUTT')" "1" "$(grep -c '^Verifiziert:' "$AUSGABE")"
+done
+
 # Fall 11: Defaults VERSUCHE=18/SLEEP_S=5 statisch abgesichert -- ein
 # Laufzeit-Test mit dem echten Default waere 18x5s=90s pro Testlauf und
 # damit zu langsam fuer diese Suite (bewusste Wahl, siehe Fix-Report).
