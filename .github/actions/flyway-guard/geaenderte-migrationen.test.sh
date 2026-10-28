@@ -7,6 +7,11 @@ HIER="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKRIPT="$HIER/geaenderte-migrationen.sh"
 FEHLER=0
 
+# Alle Wegwerf-Repos und Hilfsdateien liegen unter einem Wurzelverzeichnis, das beim
+# Beenden geloescht wird (der CI-Runner ist persistent).
+WURZEL="$(mktemp -d)"
+trap 'rm -rf -- "${WURZEL:?}"' EXIT
+
 pruefe() { # pruefe <name> <erwartet> <ist>
   if [ "$2" = "$3" ]; then
     echo "  ok   $1"
@@ -17,7 +22,7 @@ pruefe() { # pruefe <name> <erwartet> <ist>
 
 # Wegwerf-Repo mit einem Commit und dem CalVer-Tag 2026.01.01-1 darauf.
 neues_repo() {
-  local work; work="$(mktemp -d)"
+  local work; work="$(mktemp -d "$WURZEL/repo.XXXXXX")"
   git -C "$work" init --quiet >/dev/null
   git -C "$work" config user.email t@t.de
   git -C "$work" config user.name t
@@ -45,7 +50,7 @@ pruefe "leer" ""  "$out"
 
 echo "Fall 3: Basis existiert nicht -> Exit 1 mit ::error, KEINE leere Liste"
 W=$(neues_repo)
-err="$(mktemp)"
+err="$(mktemp "$WURZEL/err.XXXXXX")"
 out=$(cd "$W" && bash "$SKRIPT" 2099.01.01-1 2>"$err"); rc=$?
 pruefe "exit"         "1" "$rc"
 pruefe "error-marker" "1" "$(grep -c '::error::' "$err")"
@@ -65,12 +70,22 @@ echo "Fall 3b: Basis aufloesbar, aber git diff scheitert (keine gemeinsame Histo
 W=$(neues_repo)
 git -C "$W" checkout --quiet --orphan fremd
 git -C "$W" commit --quiet --allow-empty -m fremd >/dev/null
-err="$(mktemp)"
+err="$(mktemp "$WURZEL/err.XXXXXX")"
 out=$(cd "$W" && bash "$SKRIPT" 2026.01.01-1 2>"$err"); rc=$?
 pruefe "exit"         "1" "$rc"
 pruefe "error-marker" "1" "$(grep -c '::error::git diff' "$err")"
 pruefe "keine liste"  ""  "$out"
 rm -f "$err"
+
+echo "Fall 6: Tag und gleichnamiger Branch (mehrdeutiger Ref) -> Warnung geht nach stderr, Liste enthaelt nur die Migration, Exit 0"
+W=$(neues_repo)
+git -C "$W" branch 2026.01.01-1
+mkdir -p "$W/src/main/resources/db/migration"
+echo 'create table t(id int);' > "$W/src/main/resources/db/migration/V1__t.sql"
+git -C "$W" add -A; git -C "$W" commit --quiet -m mig >/dev/null
+out=$(cd "$W" && bash "$SKRIPT" 2026.01.01-1 2>/dev/null); rc=$?
+pruefe "exit"  "0" "$rc"
+pruefe "liste" "src/main/resources/db/migration/V1__t.sql" "$out"
 
 echo "Fall 5: action.yml ruft das Skript und enthaelt keinen eigenen git-diff-Aufruf mehr"
 # Bewusst auf den AUFRUF ('git diff --name-only') pruefen, nicht auf das Wort 'git diff':

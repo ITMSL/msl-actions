@@ -12,12 +12,13 @@ if ! git rev-parse --verify --quiet "${basis}^{commit}" >/dev/null; then
   exit 1
 fi
 
-# stderr mit einfangen, damit die Fehlerursache im Log steht und nicht nur der Exitcode.
+# Nur stdout erfassen: git-Warnungen (z.B. mehrdeutiger Ref) duerfen nicht in der
+# Dateiliste landen; die git-Meldung steht dank stderr-Durchreichung im Job-Log.
 dateien="$(git diff --name-only "${basis}...HEAD" \
-  -- '*/db/migration/*.sql' 'migrations/*.sql' '*/db/changelog/*.xml' 2>&1)"
+  -- '*/db/migration/*.sql' 'migrations/*.sql' '*/db/changelog/*.xml')"
 rc=$?
 if [ "$rc" -ne 0 ]; then
-  echo "::error::git diff ${basis}...HEAD ist fehlgeschlagen (Exit $rc): $dateien" >&2
+  echo "::error::git diff ${basis}...HEAD ist fehlgeschlagen (Exit $rc) -- Ursache siehe git-Meldung darueber." >&2
   exit 1
 fi
 
