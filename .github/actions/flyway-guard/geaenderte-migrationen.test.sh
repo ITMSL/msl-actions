@@ -93,6 +93,9 @@ echo "Fall 5: action.yml ruft das Skript und enthaelt keinen eigenen git-diff-Au
 pruefe "skript-aufruf"       "1" "$(grep -c 'geaenderte-migrationen.sh' "$HIER/action.yml")"
 pruefe "kein git-diff-Aufruf" "0" "$(grep -c 'git diff --name-only' "$HIER/action.yml")"
 pruefe "kein || true"        "0" "$(grep -c '|| true' "$HIER/action.yml")"
+# Die Aufrufzeile exakt: jede angehaengte Rueckfallebene (z. B. '|| dateien=""') wuerde den
+# Fehler des Skripts wieder schlucken (WBR Audit-Topf 1, 2026-10-28, geparkter Gate-Minor).
+pruefe "aufrufzeile exakt"   "1" "$(grep -cxF '        dateien="$(bash "${{ github.action_path }}/geaenderte-migrationen.sh" "$basis")"' "$HIER/action.yml")"
 
 echo
 if [ "$FEHLER" -eq 0 ]; then echo "Alle Faelle bestanden."; else echo "$FEHLER Fehlschlag/Fehlschlaege."; fi
