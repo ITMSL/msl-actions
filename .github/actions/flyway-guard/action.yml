@@ -36,7 +36,8 @@ runs:
           fi
         fi
         echo "Diff-Basis: $basis"
-        dateien="$(git diff --name-only "${basis}...HEAD" \
-                   -- '*/db/migration/*.sql' 'migrations/*.sql' '*/db/changelog/*.xml' || true)"
+        # Ausgelagert und einzeln getestet (geaenderte-migrationen.test.sh): ein
+        # fehlgeschlagener Diff ist ein Fehler, keine leere Liste.
+        dateien="$(bash "${{ github.action_path }}/geaenderte-migrationen.sh" "$basis")"
         [ -z "$dateien" ] && { echo "Keine Migrationen geaendert."; exit 0; }
         bash "${{ github.action_path }}/flyway-guard.sh" $dateien

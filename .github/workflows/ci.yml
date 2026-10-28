@@ -23,6 +23,8 @@ jobs:
         run: bash .github/actions/flyway-guard/flyway-guard.test.sh
       - name: Flyway-Guard Leer-Tag-Pruefung testen
         run: bash .github/actions/flyway-guard/pruefe-leere-tagliste.test.sh
+      - name: flyway-guard geaenderte-migrationen testen
+        run: bash .github/actions/flyway-guard/geaenderte-migrationen.test.sh
       - name: Release-Tags testen
         run: bash .github/actions/release-tags/release-tags.test.sh
       - name: Deploy-Stack Zielaufloesung testen
