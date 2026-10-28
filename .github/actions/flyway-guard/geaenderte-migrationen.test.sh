@@ -95,6 +95,8 @@ pruefe "kein git-diff-Aufruf" "0" "$(grep -c 'git diff --name-only' "$HIER/actio
 pruefe "kein || true"        "0" "$(grep -c '|| true' "$HIER/action.yml")"
 # Die Aufrufzeile exakt: jede angehaengte Rueckfallebene (z. B. '|| dateien=""') wuerde den
 # Fehler des Skripts wieder schlucken (WBR Audit-Topf 1, 2026-10-28, geparkter Gate-Minor).
+# SC2016 bewusst aus: die Aufrufzeile wird WOERTLICH verglichen (-F), $(...) und ${{ }} sollen nicht expandieren.
+# shellcheck disable=SC2016
 pruefe "aufrufzeile exakt"   "1" "$(grep -cxF '        dateien="$(bash "${{ github.action_path }}/geaenderte-migrationen.sh" "$basis")"' "$HIER/action.yml")"
 
 echo
