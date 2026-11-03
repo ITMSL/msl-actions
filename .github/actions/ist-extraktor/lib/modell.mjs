@@ -23,9 +23,9 @@ function sortObj(o) {
   return o;
 }
 
-export function kanonisch(ist) {
+export function vereinigeKanten(liste) {
   const kantenMap = new Map();
-  for (const k of ist.kanten) {
+  for (const k of liste) {
     const id = kantenSchluessel(k) + (k.quelle === 'deklariert' ? ' deklariert' : '');
     const vorhanden = kantenMap.get(id);
     if (vorhanden) {
@@ -34,10 +34,14 @@ export function kanonisch(ist) {
       if ((RANG[k.quelle] ?? 0) > (RANG[vorhanden.quelle] ?? 0)) vorhanden.quelle = k.quelle;
     } else kantenMap.set(id, { ...k, belege: [...k.belege] });
   }
-  const kanten = [...kantenMap.values()].map(k => ({ ...k, belege: k.belege
+  return [...kantenMap.values()].map(k => ({ ...k, belege: k.belege
     .filter((b, i, a) => a.findIndex(x => x.datei === b.datei && x.schluessel === b.schluessel) === i)
     .sort((a, b) => (a.datei + a.schluessel).localeCompare(b.datei + b.schluessel)) }))
     .sort((a, b) => kantenSchluessel(a).localeCompare(kantenSchluessel(b)));
+}
+
+export function kanonisch(ist) {
+  const kanten = vereinigeKanten(ist.kanten);
   const knoten = [...new Set([ist.repo, ...ist.knoten, ...kanten.map(k => k.ziel)])].sort();
   return sortObj({ repo: ist.repo, extraktor_version: ist.extraktor_version, typ: [...ist.typ].sort(), knoten, kanten });
 }

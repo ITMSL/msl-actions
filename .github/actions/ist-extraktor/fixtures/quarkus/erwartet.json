@@ -1,0 +1,10 @@
+{ "kanten": [
+  "db env:DB_URL",
+  "http env:GEO_SERVICE_URL",
+  "http url:app.partner-a.example.org",
+  "http url:preise.partner-b.example.org",
+  "http url:routen.partner-c.example.org",
+  "http var:partner-d.base-url",
+  "http url:beispiel.example.org",
+  "smtp smtp:smtp.example.org" ],
+  "env": { "http url:app.partner-a.example.org": "PARTNER_A_URL", "smtp smtp:smtp.example.org": "SMTP_HOST", "http url:preise.partner-b.example.org": "PARTNER_B_BASE_URL" } }

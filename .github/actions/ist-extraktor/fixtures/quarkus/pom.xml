@@ -1,0 +1,6 @@
+<project>
+  <artifactId>fixture-quarkus</artifactId>
+  <dependencies>
+    <dependency><artifactId>quarkus-rest-client</artifactId></dependency>
+  </dependencies>
+</project>
