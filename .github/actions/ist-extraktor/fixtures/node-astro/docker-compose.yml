@@ -1,0 +1,11 @@
+services:
+  app:
+    image: example/app:1
+    environment:
+      - GEO_SERVICE_URL=http://geo-service:8083
+      - SECRET_X=abc
+      - API_TOKEN_URL=https://token.example.org/x
+  worker:
+    image: example/worker:1
+    environment:
+      API_TOKEN_URL: https://token.example.org/y

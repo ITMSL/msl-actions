@@ -1,0 +1,7 @@
+const base = import.meta.env.PUBLIC_BACKEND_URL;
+export const a = () => fetch(`${base}/quote`);
+export const b = () => fetch('/orders/v1/list');
+export const c = () => axios.create({ baseURL: 'https://push.example.org/1' });
+export const d = () => fetch('https://code.example.org/repos');
+export const e = () => new URL('https://monitor.example.org/health');
+const h = process.env.HOST;

@@ -1,0 +1,5 @@
+{ "typ": ["astro","node"],
+  "kanten": [ "http env:PUBLIC_BACKEND_URL", "http pfad:/orders/v1", "http url:push.example.org",
+  "http url:code.example.org", "http url:monitor.example.org", "script url:challenges.example.org",
+  "script url:fonts.example.org", "http host:geo-service:8083" ],
+  "env": { "http host:geo-service:8083": "GEO_SERVICE_URL" } }
