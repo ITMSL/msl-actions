@@ -211,3 +211,11 @@ test('extrahiere: ignorieren ist an die Datei gebunden, derselbe Knoten aus eine
     assert.equal(r.diagnose.ignoriert, 1);
   });
 });
+
+import { reduziertesLiteral } from '../lib/extraktion.mjs';
+test('reduziertesLiteral entfernt Userinfo, Query und Fragment, behält Schema, Host, Port und Pfad', () => {
+  assert.equal(reduziertesLiteral('https://nutzer:geheimwort@x.example.org:8443/p/q?a=1#f'), 'https://x.example.org:8443/p/q');
+  assert.equal(reduziertesLiteral('jdbc:postgresql://u@db.example.org/x?ssl=1'), 'jdbc:postgresql://db.example.org/x');
+  assert.equal(reduziertesLiteral('smtp.example.org?x=1'), 'smtp.example.org');
+  assert.equal(reduziertesLiteral('/orders/v1/list?seite=2'), '/orders/v1/list');
+});
