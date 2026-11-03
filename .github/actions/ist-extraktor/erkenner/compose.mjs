@@ -4,6 +4,7 @@ import path from 'node:path';
 export const BESITZT = /(^|\/)docker-compose[^/]*\.ya?ml$|^deploy\/.*\.ya?ml$/;
 const GEHEIM_NAME = /SECRET|TOKEN|PASSWORD|PASS|KEY/;
 const ZIEL_NAME = /(URL|URI|HOST|ENDPOINT)$/;
+const SMTP_NAME = /MAILER|SMTP|IMAP/;
 const LISTE = /^\s*-\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 const MAP = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+)$/;
 const PLATZHALTER = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}$/;
@@ -20,10 +21,10 @@ export function composeTreffer(root, dateien) {
       const m = LISTE.exec(z) ?? MAP.exec(z);
       if (!m || GEHEIM_NAME.test(m[1])) return;
       const wert = m[2].trim().replace(/^["']|["']$/g, '');
-      const treffer = { datei: d, zeile: i + 1, schluessel: m[1], art: 'http', quelle: 'compose' };
+      const treffer = { datei: d, zeile: i + 1, schluessel: m[1], art: SMTP_NAME.test(m[1]) ? 'smtp' : 'http', quelle: 'compose' };
       const p = PLATZHALTER.exec(wert);
       if (p && /^https?:\/\//.test(p[2] ?? '')) out.push({ ...treffer, rohwert: p[2], env: p[1] });
-      else if (p && p[2] === undefined && ZIEL_NAME.test(m[1])) out.push({ ...treffer, rohwert: null, env: p[1] });
+      else if (p && (p[2] ?? '') === '' && ZIEL_NAME.test(m[1])) out.push({ ...treffer, rohwert: null, env: p[1] });
       else if (/^https?:\/\//.test(wert)) out.push({ ...treffer, rohwert: wert, env: m[1] });
     });
   }

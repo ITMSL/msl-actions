@@ -55,6 +55,8 @@ test('Compose-Erkenner direkt: beide Formen und Default, nichts außerhalb von e
     `${C} | http | compose | PARTNER_F_URL | https://partner-f.example.org/api | PARTNER_F_URL | -`,
     `${C} | http | compose | PARTNER_G_URL | - | PARTNER_G_URL | -`,
     `${C} | http | compose | PARTNER_E_URL | http://partner-e:9000 | PARTNER_E_URL | -`,
+    `${C} | http | compose | PARTNER_I_URL | - | PARTNER_I_URL | -`,
+    `${C} | smtp | compose | MAILER_HOST | - | SMTP_HOST | -`,
   ];
   assert.deepEqual(composeTreffer(root, dateien).map(fmt).sort(), erwartetTreffer.sort());
 });

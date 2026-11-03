@@ -7,6 +7,8 @@ services:
       - API_TOKEN_URL=https://token.example.org/x
       - PARTNER_F_URL=${PARTNER_F_URL:-https://partner-f.example.org/api}
       - PARTNER_G_URL=${PARTNER_G_URL}
+      - PARTNER_I_URL=${PARTNER_I_URL:-}
+      - FLAG=${FLAG}
     healthcheck:
       url: http://localhost:8080/health
   worker:
@@ -14,3 +16,4 @@ services:
     environment:
       API_TOKEN_URL: https://token.example.org/y
       PARTNER_E_URL: http://partner-e:9000
+      MAILER_HOST: ${SMTP_HOST}

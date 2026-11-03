@@ -68,10 +68,11 @@ test('Doku, Lockfiles und XML werden nicht gescannt, HTML und JSON außerhalb do
   });
 });
 test('mit .git zählen nur getrackte Dateien, ohne .git der Dateisystem-Lauf', () => {
-  mitBaum({ 'a.js': 'x\n', 'b.js': 'y\n', '.env': 'u.url=https://geheim.example.org\n', 'sub/c.js': 'z\n' }, dir => {
+  mitBaum({ 'a.js': 'x\n', 'b.js': 'y\n', '.env': 'u.url=https://geheim.example.org\n', 'sub/c.js': 'z\n',
+    'docs/x.json': 'z\n', 'node_modules/y.js': 'z\n', '.versteckt/z.js': 'z\n' }, dir => {
     assert.deepEqual(textDateien(dir), ['.env', 'a.js', 'b.js', 'sub/c.js']);
     execFileSync('git', ['init', '-q', dir]);
-    execFileSync('git', ['-C', dir, 'add', 'a.js', 'b.js', 'sub/c.js']);
+    execFileSync('git', ['-C', dir, 'add', 'a.js', 'b.js', 'sub/c.js', 'docs/x.json', 'node_modules/y.js', '.versteckt/z.js']);
     rmSync(path.join(dir, 'b.js'));
     assert.deepEqual(textDateien(dir), ['a.js', 'sub/c.js']);
   });
