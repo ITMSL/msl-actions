@@ -48,3 +48,101 @@ test('Treffer-Id: zwei relative Pfade je Zeile bleiben, Erkenner verdrängt gene
   const r = vereinigeTreffer([{ rang: 2, treffer: [{ ...erk, schluessel: 'script-src' }] }, { rang: 1, treffer: [gen] }]);
   assert.equal(r.length, 1); assert.equal(r[0].art, 'script');
 });
+
+import path from 'node:path';
+import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { cpSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
+import { extrahiere } from '../lib/extraktion.mjs';
+import { VERSION } from '../lib/modell.mjs';
+
+const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'fixtures');
+function mitKopie(name, fn) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-extrahiere-'));
+  try {
+    cpSync(path.join(fixtures, name), dir, { recursive: true });
+    return fn(dir);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+const regelDatei = dir => path.join(dir, 'docs', 'architektur', 'ist-regeln.md');
+const schluessel = ist => ist.kanten.map(k => `${k.art} ${k.ziel}`);
+
+test('extrahiere: ignorieren entfernt die Kante samt Beleg und zählt', () => {
+  mitKopie('quarkus', dir => {
+    const r = extrahiere(dir, { repo: 'ITMSL/fixture' });
+    assert.deepEqual(r.fehler, []);
+    assert.ok(!schluessel(r.ist).includes('http url:beispiel.example.org'));
+    assert.equal(r.diagnose.ignoriert, 1);
+    assert.equal(r.ist.extraktor_version, VERSION);
+    assert.equal(r.ist.repo, 'ITMSL/fixture');
+    assert.ok(!JSON.stringify(r.ist).includes('"zeile"'));
+    rmSync(regelDatei(dir));
+    const ohne = extrahiere(dir, { repo: 'ITMSL/fixture' });
+    assert.ok(schluessel(ohne.ist).includes('http url:beispiel.example.org'));
+    assert.equal(ohne.diagnose.ignoriert, 0);
+  });
+});
+
+test('extrahiere: fehlende erwartet-Kante ist ein ERWARTET-Fehler und steht in der Diagnose', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(regelDatei(dir), 'erwartet: http url:gibt-es-nicht.example.org\n');
+    const r = extrahiere(dir, { repo: 'ITMSL/fixture' });
+    assert.deepEqual(r.diagnose.erwartetFehlend, ['http url:gibt-es-nicht.example.org']);
+    assert.deepEqual(r.fehler.map(f => f.code), ['ERWARTET']);
+  });
+});
+
+test('extrahiere: erwartet: keine mit Kanten nennt die Anzahl der Kanten', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(regelDatei(dir), 'erwartet: keine — test\n');
+    const r = extrahiere(dir, { repo: 'ITMSL/fixture' });
+    assert.deepEqual(r.fehler.map(f => f.code), ['ERWARTET']);
+    assert.match(r.fehler[0].text, /^erwartet: keine, aber 9 Kanten$/);
+  });
+});
+
+test('extrahiere: Regelfehler werden als REGEL gemeldet', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(regelDatei(dir), 'ignorieren: kaputt\n');
+    assert.deepEqual(extrahiere(dir, { repo: 'a/b' }).fehler.map(f => f.code), ['REGEL']);
+  });
+});
+
+test('extrahiere: pflichtRegeln verlangt die Regeldatei', () => {
+  mitKopie('oeffentlich-rot', dir => {
+    assert.deepEqual(extrahiere(dir, { repo: 'a/b' }).fehler, []);
+    const r = extrahiere(dir, { repo: 'a/b', pflichtRegeln: true });
+    assert.deepEqual(r.fehler.map(f => f.code), ['REGEL']);
+  });
+});
+
+test('extrahiere: deklariert fügt eine Kante mit quelle deklariert und Beleg deklariert hinzu', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(regelDatei(dir), 'deklariert: http url:api.partner-d.example.org src/main/java/PartnerDClient.java — URL wird gebaut\n');
+    const k = extrahiere(dir, { repo: 'a/b' }).ist.kanten.find(x => x.ziel === 'url:api.partner-d.example.org');
+    assert.equal(k.quelle, 'deklariert');
+    assert.deepEqual(k.belege, [{ datei: 'src/main/java/PartnerDClient.java', schluessel: 'deklariert' }]);
+  });
+});
+
+test('extrahiere: Form-Guard greift nur bei oeffentlich und meldet jeden roten Knoten', () => {
+  mitKopie('oeffentlich-rot', dir => {
+    const privat = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(privat.fehler, []);
+    assert.ok(schluessel(privat.ist).includes('http host:geo-service:8083'));
+    const r = extrahiere(dir, { repo: 'a/b', oeffentlich: true });
+    assert.deepEqual(r.fehler.map(f => f.code), ['FORM']);
+    assert.match(r.fehler[0].text, /host:geo-service:8083/);
+  });
+});
+
+test('extrahiere: Secret-Guard hat Vorrang und ist durch ignorieren nicht auszuschalten', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(path.join(dir, 'src', 'main', 'java', 'Geheim.java'), '// https://' + 'benutzer:pw' + '@host.example.org/x\n');
+    writeFileSync(regelDatei(dir), 'ignorieren: src/main/java/Geheim.java url:host.example.org — Versuch\nerwartet: http url:gibt-es-nicht.example.org\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(r.fehler.map(f => f.code), ['SECRET']);
+    assert.equal(r.ist, null);
+    assert.ok(!JSON.stringify(r).includes('pw@'));
+  });
+});

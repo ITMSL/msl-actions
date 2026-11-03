@@ -1,5 +1,6 @@
-import { kante, vereinigeKanten } from './modell.mjs';
-import { zielknoten } from './normalisierung.mjs';
+import { kante, vereinigeKanten, kantenSchluessel, kanonisch, VERSION } from './modell.mjs';
+import { zielknoten, formGuardOeffentlich } from './normalisierung.mjs';
+import { leseRegeln } from './regeln.mjs';
 import { pruefeRohwert } from './secret-guard.mjs';
 import { textDateien, repoTypen } from './dateien.mjs';
 import { generischeTreffer } from './generisch.mjs';
@@ -67,4 +68,50 @@ export function extrahiereRoh(root) {
   const treffer = vereinigeTreffer(listen);
   const kanten = vereinigeKanten(trefferZuKanten(treffer, { laufausgabe }));
   return { typ, kanten, laufausgabe, diagnose: { treffer: treffer.length, verworfen: laufausgabe.filter(z => z.startsWith('verworfen ')).length } };
+}
+
+export function extrahiere(root, { repo, oeffentlich = false, pflichtRegeln = false } = {}) {
+  const fehler = [], laufausgabe = [];
+  const regeln = leseRegeln(root, { pflicht: pflichtRegeln });
+  for (const text of regeln.fehler) fehler.push({ code: 'REGEL', text });
+  const diagnose = { treffer: 0, ignoriert: 0, deklariert: 0, erwartetFehlend: [] };
+  let roh;
+  try { roh = extrahiereRoh(root); } catch (e) {
+    if (e.code !== 'SECRET' && e.code !== 'KONFLIKT') throw e;
+    return { ist: null, laufausgabe, diagnose, fehler: [...fehler, { code: e.code, text: e.message }] };
+  }
+  laufausgabe.push(...roh.laufausgabe);
+  Object.assign(diagnose, roh.diagnose);
+
+  let kanten = roh.kanten;
+  for (const { datei, ziel, grund } of regeln.ignorieren) {
+    for (const k of kanten) {
+      if (k.ziel !== ziel) continue;
+      const vorher = k.belege.length;
+      k.belege = k.belege.filter(b => b.datei !== datei);
+      if (k.belege.length < vorher) {
+        diagnose.ignoriert += vorher - k.belege.length;
+        laufausgabe.push(`ignoriert ${datei} ${ziel} (${grund})`);
+      }
+    }
+    kanten = kanten.filter(k => k.belege.length > 0);
+  }
+
+  const deklariert = regeln.deklariert.map(d => kante(d.art, d.ziel, { datei: d.datei, schluessel: 'deklariert' }, 'deklariert'));
+  diagnose.deklariert = deklariert.length;
+  kanten = vereinigeKanten([...kanten, ...deklariert]);
+
+  const vorhanden = new Set(kanten.map(kantenSchluessel));
+  if (regeln.erwartet === 'keine') {
+    if (kanten.length) fehler.push({ code: 'ERWARTET', text: `erwartet: keine, aber ${kanten.length} Kanten` });
+  } else for (const k of regeln.erwartet) if (!vorhanden.has(k)) {
+    diagnose.erwartetFehlend.push(k);
+    fehler.push({ code: 'ERWARTET', text: `erwartet fehlt: ${k}` });
+  }
+
+  if (oeffentlich) for (const k of formGuardOeffentlich([...new Set(kanten.map(x => x.ziel))]))
+    fehler.push({ code: 'FORM', text: `Form-Guard (öffentliches Repo): ${k}` });
+
+  const ist = kanonisch({ repo, extraktor_version: VERSION, typ: roh.typ, knoten: [], kanten });
+  return { ist, laufausgabe, diagnose, fehler };
 }
