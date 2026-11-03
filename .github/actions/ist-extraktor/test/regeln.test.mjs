@@ -98,7 +98,7 @@ const UNGUELTIG = [
   'url:intern-host',
   `url:API.EXAMPLE.ORG`,
   'host:Gross',
-  'env:klein',
+  'env:a/b', 'env:https://nutzer:geheimwort@h.example.org', 'var:%prod.a b',
   'pfad:ohne-schraegstrich',
   'file:',
   'action:nur-owner',
@@ -122,7 +122,7 @@ test('Regelknoten: ungültige Zielknoten sind in deklariert, ignorieren und erwa
 test('Regelknoten: je Präfix ein gültiger Knoten wird angenommen', () => {
   const gueltig = ['url:api.example.org', 'url:api.example.org:8443', 'host:geo-service', 'host:geo-service:8083', 'db:postgresql@postgres',
     'db:unbekannt@db.example.org:5432', 'smtp:smtp.example.org', 'ssh:ssh.example.org:22', 'file:/var/data/export', 'file:/var/data/*',
-    'action:ITMSL/msl-actions', 'env:GEO_SERVICE_URL', 'var:partner-d.base-url', 'pfad:/orders/v1'];
+    'action:ITMSL/msl-actions', 'env:GEO_SERVICE_URL', 'env:db.url', 'var:partner-d.base-url', 'var:%prod.bar.url', 'pfad:/orders/v1'];
   for (const ziel of gueltig) {
     mitRegeln(`deklariert: http ${ziel} src/a.java — Grund\nignorieren: src/a.java ${ziel} — Grund\nerwartet: http ${ziel}\n`, r => {
       assert.deepEqual(r.fehler, [], ziel);

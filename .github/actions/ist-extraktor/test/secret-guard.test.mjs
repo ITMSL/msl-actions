@@ -75,3 +75,15 @@ test('istZufallswert', () => {
   assert.equal(istZufallswert('Zq9vL2mN8kP4rT6wY1b'), false);
   assert.equal(istZufallswert('direktkurier-saarbruecken-v2'), false);
 });
+
+test('führende und folgende Leerzeichen und Tabs umgehen die Prüfung nicht', () => {
+  for (const pre of [' ', '\t', ' \t ', '\u00a0']) {
+    assert.equal(s(pre + 'https://nutzer:geheimwort1@lead.example.org/x'), 'url_anteil', JSON.stringify(pre));
+    assert.equal(s('https://nutzer:geheimwort1@lead.example.org/x' + pre), 'url_anteil', JSON.stringify(pre));
+    assert.equal(s(pre + ghToken), 'geheimnis', JSON.stringify(pre));
+    assert.equal(s(pre + '/x?token=abcdefabcdefabcdefab'), 'url_anteil', JSON.stringify(pre));
+    assert.equal(s(pre + '/hooks/Zq9vL2mN8kP4rT6wY1bC3dF7gH/run'), 'url_anteil', JSON.stringify(pre));
+    assert.equal(s(pre + 'https://api.example.org/p?x=1'), 'reduziert', JSON.stringify(pre));
+    assert.equal(s(pre + 'https://api.example.org/p'), 'ok', JSON.stringify(pre));
+  }
+});

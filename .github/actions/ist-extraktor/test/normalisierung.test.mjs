@@ -29,7 +29,7 @@ test('Form-Guard', () => {
 import { knotenGueltig } from '../lib/normalisierung.mjs';
 test('knotenGueltig: eng je Präfix, Zufallswerte und Zugangsdaten sind ungültig', () => {
   for (const k of ['url:api.example.org', 'url:api.example.org:8443', 'host:geo-service:8083', 'db:postgresql@postgres', 'smtp:smtp.example.org',
-    'ssh:ssh.example.org', 'file:/var/data/*', 'action:ITMSL/msl-actions', 'env:A_URL', 'var:a.b-c_d', 'pfad:/orders/v1']) assert.equal(knotenGueltig(k), true, k);
+    'ssh:ssh.example.org', 'file:/var/data/*', 'action:ITMSL/msl-actions', 'env:A_URL', 'env:db.url', 'var:a.b-c_d', 'var:%prod.bar.url', 'pfad:/orders/v1']) assert.equal(knotenGueltig(k), true, k);
   for (const k of ['url:10.0.0.5', 'url:intern-host', 'url:Api.example.org', 'url:https://u:pw@api.example.org/v1', 'url:api.example.org/pfad',
-    'host:A', 'db:postgresql', 'env:klein', 'var:a b', 'pfad:x', 'file:', 'action:x', 'xyz:abc', '', 'url:', 'pfad:/hooks/Zq9vL2mN8kP4rT6wY1bC3dF7gH']) assert.equal(knotenGueltig(k), false, k);
+    'host:A', 'db:postgresql', 'env:a/b', 'env:https://u:pw@h.example.org', 'var:https://u:pw@h.example.org', 'var:a b', 'pfad:x', 'file:', 'action:x', 'xyz:abc', '', 'url:', 'pfad:/hooks/Zq9vL2mN8kP4rT6wY1bC3dF7gH']) assert.equal(knotenGueltig(k), false, k);
 });

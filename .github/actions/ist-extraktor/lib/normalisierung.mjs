@@ -51,8 +51,8 @@ const KNOTEN_FORM = {
   ssh: HOST,
   file: /^[\w./*-]+$/,
   action: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/,
-  env: /^[A-Z0-9_]+$/,
-  var: /^[A-Za-z0-9_.-]+$/,
+  env: /^[A-Za-z0-9_.-]+$/,
+  var: /^[A-Za-z0-9_.%-]+$/,
   pfad: /^\/[^\s?#]*$/,
 };
 

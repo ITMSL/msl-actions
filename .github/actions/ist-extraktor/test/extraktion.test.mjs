@@ -219,3 +219,19 @@ test('reduziertesLiteral entfernt Userinfo, Query und Fragment, behält Schema, 
   assert.equal(reduziertesLiteral('smtp.example.org?x=1'), 'smtp.example.org');
   assert.equal(reduziertesLiteral('/orders/v1/list?seite=2'), '/orders/v1/list');
 });
+
+test('reduziertesLiteral trimmt führende Leerzeichen und Tabs, bevor Userinfo und Query entfernt werden', () => {
+  assert.equal(reduziertesLiteral(' https://nutzer:geheimwort1@x.example.org/p?a=1'), 'https://x.example.org/p');
+  assert.equal(reduziertesLiteral('\thttps://nutzer:geheimwort1@x.example.org:8443/p#f '), 'https://x.example.org:8443/p');
+  assert.equal(reduziertesLiteral('  /orders/v1?x=1'), '/orders/v1');
+});
+
+test('Quarkus-Platzhalter mit führendem Leerzeichen im Default wirft SECRET', () => {
+  mitKopie('quarkus', dir => {
+    const p = path.join(dir, 'src', 'main', 'resources', 'application.properties');
+    writeFileSync(p, readFileSync(p, 'utf8') + 'foo.url=${FOO_URL: https://nutzer:geheimwort1@h.example.org}\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(r.fehler.map(f => f.code), ['SECRET']);
+    assert.ok(!JSON.stringify(r).includes('geheimwort1'));
+  });
+});

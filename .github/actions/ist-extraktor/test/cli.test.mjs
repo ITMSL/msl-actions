@@ -326,3 +326,35 @@ test('action.yml: run-Block gibt bei privat Exit 0, bei false und leer Exit 2 (F
     assert.equal(ausfuehren('').status, 2);
   });
 });
+
+test('Wert mit führendem Leerzeichen oder Tab in einer .env-Datei: Exit 2, das Passwort steht nirgends in der Ausgabe', () => {
+  for (const pre of [' ', '\t']) {
+    mitKopie('quarkus', dir => {
+      writeFileSync(path.join(dir, 'app.env'), `BACKEND_URL="${pre}https://nutzer:geheimwort1@lead.example.org/x"\n`);
+      for (const kmd of ['extract', 'check']) {
+        const r = lauf([kmd, dir, '--repo', 'x/y']);
+        assert.equal(r.code, 2, `${kmd} ${JSON.stringify(pre)}: ${alles(r)}`);
+        assert.match(r.err, /SECRET: .*app\.env:1/);
+        assert.ok(!alles(r).includes('geheimwort1') && !alles(r).includes('nutzer'));
+      }
+    });
+  }
+});
+
+test('update-Vorlage besteht die eigene Prüfung auch mit Punkt-Env und Profil-var', () => {
+  mitKopie('quarkus', dir => {
+    const p = path.join(dir, 'src', 'main', 'resources', 'application.properties');
+    writeFileSync(p, readFileSync(p, 'utf8') + 'foo.url=${db.url}\n');
+    mkdirSync(path.join(dir, 'config'), { recursive: true });
+    writeFileSync(path.join(dir, 'config', 'andere.properties'), '%prod.bar.url=${BAR_URL_X}\n');
+    rmSync(regelDatei(dir));
+    const u = lauf(['update', dir, '--repo', 'x/y']);
+    assert.equal(u.code, 0, alles(u));
+    const ist = JSON.parse(readFileSync(istJson(dir), 'utf8'));
+    const ziele = ist.kanten.map(k => k.ziel);
+    assert.ok(ziele.includes('env:db.url'), ziele.join());
+    assert.ok(ziele.includes('var:%prod.bar.url'), ziele.join());
+    const c = lauf(['check', dir, '--repo', 'x/y']);
+    assert.equal(c.code, 0, alles(c));
+  });
+});

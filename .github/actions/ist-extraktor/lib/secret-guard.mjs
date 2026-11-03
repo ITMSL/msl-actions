@@ -39,7 +39,7 @@ function pfadZufall(w) {
 }
 
 export function pruefeRohwert(wert) {
-  const w = String(wert ?? '');
+  const w = String(wert ?? '').trim();
   if (GEHEIM.some(m => m.test(w))) return { status: 'geheimnis', grund: 'Geheimnismuster' };
   if (USERINFO.test(w)) return { status: 'url_anteil', grund: 'Userinfo in URL' };
   if (TOKEN_PARAM.test(w)) return { status: 'url_anteil', grund: 'Token-Parameter im Query' };

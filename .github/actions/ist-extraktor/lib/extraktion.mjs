@@ -33,7 +33,8 @@ export const pfadPraefix = p => {
   return '/' + (s.length > 1 && /^v\d+$/.test(s[1]) ? s.slice(0, 2).join('/') : s[0] ?? '');
 };
 
-export function reduziertesLiteral(w) {
+export function reduziertesLiteral(wert) {
+  const w = String(wert).trim();
   const m = /^((?:jdbc:)?[a-z][a-z0-9+.-]*:\/\/)(?:[^/@\s]+@)?([^/?#\s]*)([^?#\s]*)/i.exec(w);
   return m ? m[1] + m[2] + m[3] : w.split(/[?#]/)[0];
 }
