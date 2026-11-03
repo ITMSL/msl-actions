@@ -73,4 +73,5 @@ test('istZufallswert', () => {
   assert.equal(istZufallswert('cf140477-4315-4024-a247-01'), true);
   assert.equal(istZufallswert('Zq9vL2mN8kP4rT6wY1bC'), true);
   assert.equal(istZufallswert('Zq9vL2mN8kP4rT6wY1b'), false);
+  assert.equal(istZufallswert('direktkurier-saarbruecken-v2'), false);
 });

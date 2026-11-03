@@ -8,7 +8,7 @@ services:
       - PARTNER_F_URL=${PARTNER_F_URL:-https://partner-f.example.org/api}
       - PARTNER_G_URL=${PARTNER_G_URL}
     healthcheck:
-      test: ["CMD", "curl", "http://localhost:8080/health"]
+      url: http://localhost:8080/health
   worker:
     image: example/worker:1
     environment:
