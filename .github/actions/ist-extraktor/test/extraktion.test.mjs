@@ -146,3 +146,68 @@ test('extrahiere: Secret-Guard hat Vorrang und ist durch ignorieren nicht auszus
     assert.ok(!JSON.stringify(r).includes('pw@'));
   });
 });
+
+test('unaufgelöster Platzhalter mit Schlüssel wird var:-Kante ohne Rohwert, sonstiger Verwurf bleibt', () => {
+  const laufausgabe = [];
+  const k = trefferZuKanten([
+    { datei: '.github/workflows/x.yml', zeile: 4, schluessel: 'SFTP_HOST', rohwert: '${{ secrets.X }}', art: 'http' },
+    { datei: 'a.properties', zeile: 2, schluessel: 'foo-host', rohwert: 'true', art: 'http' },
+    { datei: 'a.properties', zeile: 3, schluessel: null, rohwert: '${EIN_HOST}', art: 'http' },
+  ], { laufausgabe });
+  assert.deepEqual(k.map(x => `${x.art} ${x.ziel}`), ['http var:SFTP_HOST']);
+  assert.deepEqual(k[0].belege, [{ datei: '.github/workflows/x.yml', schluessel: 'SFTP_HOST' }]);
+  assert.ok(!JSON.stringify(k).includes('secrets'));
+  assert.equal(laufausgabe.filter(z => z.startsWith('verworfen ')).length, 2);
+});
+
+test('Platzhalter in einer Workflow-Datei erscheint im Gesamtlauf als var:-Kante', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-platzhalter-'));
+  try {
+    mkdirSync(path.join(dir, '.github', 'workflows'), { recursive: true });
+    writeFileSync(path.join(dir, '.github', 'workflows', 'x.yml'), 'env:\n  SFTP_HOST: ${{ secrets.X }}\n  foo-host: true\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(schluessel(r.ist), ['http var:SFTP_HOST']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Laufausgabe trägt das reduzierte Literal ohne Userinfo, Query und Fragment, auch für env-, var- und pfad-Kanten', () => {
+  const laufausgabe = [];
+  trefferZuKanten([
+    { datei: 'a.java', zeile: 3, schluessel: null, rohwert: 'https://x.example.org:8443/p/q?lang=de#abschnitt', art: 'http' },
+    { datei: 'a.ts', zeile: 5, schluessel: 'fetch', rohwert: null, pfad: '/orders/v1/list?seite=2', art: 'http' },
+    { datei: 'a.properties', zeile: 1, schluessel: 'a.url', rohwert: null, env: 'A_URL', art: 'http' },
+    { datei: 'a.properties', zeile: 2, schluessel: 'b.url', rohwert: null, art: 'http' },
+  ], { laufausgabe });
+  assert.deepEqual(laufausgabe, [
+    'a.java:3 http url:x.example.org:8443 [https://x.example.org:8443/p/q] (literal)',
+    'a.ts:5 http pfad:/orders/v1 [/orders/v1/list] (fetch)',
+    'a.properties:1 http env:A_URL (a.url)',
+    'a.properties:2 http var:b.url (b.url)',
+  ]);
+});
+
+test('Konfliktmeldung nennt Datei, Zeile und Arten, aber nie den Rohwert', () => {
+  const g = { datei: 'a.astro', zeile: 2, schluessel: 'k', rohwert: 'https://nutzer:geheimwort@x.example.org/s.js', art: 'http' };
+  assert.throws(() => vereinigeTreffer([{ rang: 2, treffer: [g] }, { rang: 2, treffer: [{ ...g, art: 'script' }] }]),
+    e => e.code === 'KONFLIKT' && /a\.astro:2/.test(e.message) && /http/.test(e.message) && /script/.test(e.message) && !/geheimwort|nutzer/.test(e.message));
+});
+
+test('extrahiere: erwartet prüft gegen die Kanten nach ignorieren und nach deklariert', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(regelDatei(dir), 'ignorieren: src/main/java/App.java url:beispiel.example.org — Kommentar\nerwartet: http url:beispiel.example.org\n');
+    const a = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(a.diagnose.erwartetFehlend, ['http url:beispiel.example.org']);
+    writeFileSync(regelDatei(dir), 'deklariert: http url:api.partner-d.example.org src/main/java/PartnerDClient.java — gebaut\nerwartet: http url:api.partner-d.example.org\n');
+    assert.deepEqual(extrahiere(dir, { repo: 'a/b' }).fehler, []);
+  });
+});
+
+test('extrahiere: ignorieren ist an die Datei gebunden, derselbe Knoten aus einer zweiten Datei bleibt', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(path.join(dir, 'src', 'main', 'java', 'Zwei.java'), '// https://beispiel.example.org/zwei\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    const k = r.ist.kanten.find(x => x.ziel === 'url:beispiel.example.org');
+    assert.deepEqual(k.belege.map(b => b.datei), ['src/main/java/Zwei.java']);
+    assert.equal(r.diagnose.ignoriert, 1);
+  });
+});

@@ -19,7 +19,7 @@ export function vereinigeTreffer(listen) {
     const alt = map.get(id);
     if (!alt) { map.set(id, { ...t, rang }); continue; }
     if ((alt.art ?? 'http') !== (t.art ?? 'http') && alt.rang === rang) {
-      const e = new Error(`Konflikt ${id}: ${alt.art ?? 'http'} vs ${t.art ?? 'http'}`);
+      const e = new Error(`Konflikt ${t.datei}:${t.zeile} ${t.schluessel ?? '(literal)'}: ${alt.art ?? 'http'} vs ${t.art ?? 'http'}`);
       e.code = 'KONFLIKT';
       throw e;
     }
@@ -32,6 +32,11 @@ export const pfadPraefix = p => {
   const s = p.split('?')[0].split('/').filter(Boolean);
   return '/' + (s.length > 1 && /^v\d+$/.test(s[1]) ? s.slice(0, 2).join('/') : s[0] ?? '');
 };
+
+export function reduziertesLiteral(w) {
+  const m = /^((?:jdbc:)?[a-z][a-z0-9+.-]*:\/\/)(?:[^/@\s]+@)?([^/?#\s]*)([^?#\s]*)/i.exec(w);
+  return m ? m[1] + m[2] + m[3] : w.split(/[?#]/)[0];
+}
 
 export function trefferZuKanten(treffer, { laufausgabe = [] } = {}) {
   const out = [];
@@ -46,11 +51,28 @@ export function trefferZuKanten(treffer, { laufausgabe = [] } = {}) {
         throw e;
       }
     }
-    if (t.pfad) { out.push(kante(art, 'pfad:' + pfadPraefix(t.pfad), beleg, quelle)); continue; }
-    if (t.rohwert == null) { out.push(kante(art, t.env ? `env:${t.env}` : `var:${t.schluessel ?? 'unbekannt'}`, beleg, quelle)); continue; }
+    const stelle = (ziel, literal) => `${t.datei}:${t.zeile} ${art} ${ziel}${literal == null ? '' : ` [${reduziertesLiteral(literal)}]`} (${t.schluessel ?? 'literal'})`;
+    if (t.pfad) {
+      const ziel = 'pfad:' + pfadPraefix(t.pfad);
+      laufausgabe.push(stelle(ziel, t.pfad));
+      out.push(kante(art, ziel, beleg, quelle));
+      continue;
+    }
+    if (t.rohwert == null) {
+      const ziel = t.env ? `env:${t.env}` : `var:${t.schluessel ?? 'unbekannt'}`;
+      laufausgabe.push(stelle(ziel));
+      out.push(kante(art, ziel, beleg, quelle));
+      continue;
+    }
     const ziel = zielknoten(art, t.rohwert);
+    if (!ziel && t.schluessel && t.rohwert.includes('${')) {
+      const platzhalter = `var:${t.schluessel}`;
+      laufausgabe.push(stelle(platzhalter));
+      out.push(kante(art, platzhalter, beleg, quelle));
+      continue;
+    }
     if (!ziel) { laufausgabe.push(`verworfen ${t.datei}:${t.zeile} ${t.schluessel ?? ''}`); continue; }
-    laufausgabe.push(`${t.datei}:${t.zeile} ${art} ${ziel} (${t.schluessel ?? 'literal'})`);
+    laufausgabe.push(stelle(ziel, t.rohwert));
     out.push(kante(art, ziel, beleg, quelle, t.env ?? undefined));
   }
   return out;

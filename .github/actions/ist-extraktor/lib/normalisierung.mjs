@@ -1,3 +1,4 @@
+import { pruefeRohwert } from './secret-guard.mjs';
 export function istFqdn(host) {
   const h = host.replace(/:\d+$/, '');
   return h !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(h) && /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(h);
@@ -39,4 +40,25 @@ export function zielknoten(art, rohwert) {
 
 export function formGuardOeffentlich(knoten) {
   return knoten.filter(k => (k.startsWith('host:') && !istFqdn(k.slice(5))) || /^(db|ssh|smtp|file):/.test(k));
+}
+
+const HOST = /^[a-z0-9]+(?:[.-][a-z0-9]+)*(?::\d+)?$/;
+const KNOTEN_FORM = {
+  url: /^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?::\d+)?$/,
+  host: HOST,
+  db: /^[a-z]+@[a-z0-9]+(?:[.-][a-z0-9]+)*(?::\d+)?$/,
+  smtp: HOST,
+  ssh: HOST,
+  file: /^[\w./*-]+$/,
+  action: /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/,
+  env: /^[A-Z0-9_]+$/,
+  var: /^[A-Za-z0-9_.-]+$/,
+  pfad: /^\/[^\s?#]*$/,
+};
+
+export function knotenGueltig(knoten) {
+  const m = /^([a-z]+):(.+)$/s.exec(String(knoten));
+  if (!m || !Object.hasOwn(KNOTEN_FORM, m[1]) || !KNOTEN_FORM[m[1]].test(m[2])) return false;
+  const g = pruefeRohwert(m[2]);
+  return g.status !== 'geheimnis' && g.status !== 'url_anteil';
 }

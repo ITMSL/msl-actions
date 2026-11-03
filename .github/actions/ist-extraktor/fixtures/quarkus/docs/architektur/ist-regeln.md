@@ -6,3 +6,4 @@ erwartet: http url:preise.partner-b.example.org
 erwartet: http url:routen.partner-c.example.org
 erwartet: http var:partner-d.base-url
 erwartet: smtp smtp:smtp.example.org
+erwartet: http var:quarkus.rest-client.ohne-property.url

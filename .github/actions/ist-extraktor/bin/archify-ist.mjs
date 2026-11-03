@@ -56,19 +56,24 @@ function meldeFehler(fehler) {
 }
 
 function abbild(ist) {
-  const z = [`repo=${ist.repo}`, `extraktor_version=${ist.extraktor_version}`, ...ist.typ.map(t => `typ=${t}`)];
+  const z = [`repo=${ist.repo}`, `extraktor_version=${ist.extraktor_version}`, ...ist.typ.map(t => `typ=${t}`), ...ist.knoten.map(k => `knoten=${k}`)]
+    .map(text => ({ text, kante: null }));
   for (const k of ist.kanten) {
-    const s = `${k.art} ${k.ziel}`;
-    z.push(s, `${s} quelle=${k.quelle}`);
-    if (k.env) z.push(`${s} env=${k.env}`);
-    for (const b of k.belege) z.push(`${s} beleg=${b.datei}#${b.schluessel}`);
+    const s = `${k.art} ${k.ziel}`, dazu = text => z.push({ text, kante: s });
+    dazu(s);
+    dazu(`${s} quelle=${k.quelle}`);
+    if (k.env) dazu(`${s} env=${k.env}`);
+    for (const b of k.belege) dazu(`${s} beleg=${b.datei}#${b.schluessel}`);
   }
   return z;
 }
 
 function diffZeilen(alt, neu) {
-  const a = new Set(abbild(alt)), n = new Set(abbild(neu));
-  return [...[...n].filter(z => !a.has(z)).map(z => `+ ${z}`), ...[...a].filter(z => !n.has(z)).map(z => `- ${z}`)];
+  const a = abbild(alt), n = abbild(neu), at = new Set(a.map(x => x.text)), nt = new Set(n.map(x => x.text));
+  return [
+    ...n.filter(x => !at.has(x.text)).map(x => ({ ...x, text: `+ ${x.text}` })),
+    ...a.filter(x => !nt.has(x.text)).map(x => ({ ...x, text: `- ${x.text}` })),
+  ];
 }
 
 const vorlage = kanten => [
@@ -112,13 +117,16 @@ function main(argv) {
   }
 
   if (!existsSync(ziel)) { console.error(`${IST} fehlt – mit "archify-ist update" anlegen`); return 1; }
-  const soll = serialisieren(r.ist), ist = readFileSync(ziel, 'utf8');
+  const soll = serialisieren(r.ist), ist = readFileSync(ziel, 'utf8').replace(/\r\n/g, '\n');
   if (soll === ist) { console.error(`${IST} aktuell (${r.ist.kanten.length} Kanten)`); return 0; }
   let diff = [];
   try { diff = diffZeilen(kanonisch(JSON.parse(ist)), r.ist); } catch { console.error(`${IST} ist kein gueltiges JSON`); return 1; }
   console.error(`${IST} weicht vom Code ab:`);
-  if (diff.length) console.error(diff.join('\n'));
+  if (diff.length) console.error(diff.map(d => d.text).join('\n'));
   else console.error('Inhalt gleich, nur die Formatierung weicht ab');
+  const neu = [...new Set(diff.filter(d => d.kante && d.text.startsWith('+ ')).map(d => d.kante))];
+  const fundstellen = r.laufausgabe.filter(z => neu.some(k => z.includes(` ${k} `)));
+  if (fundstellen.length) console.error(['Fundstellen im Code:', ...fundstellen.map(z => `  ${z}`)].join('\n'));
   return 1;
 }
 

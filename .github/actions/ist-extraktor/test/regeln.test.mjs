@@ -90,3 +90,58 @@ test('fehlende Datei: pflicht false liefert leere Regeln, pflicht true einen Feh
     assert.match(r.fehler[0], /ist-regeln\.md fehlt/);
   }, { pflicht: true });
 });
+
+const ZUGANG = 'geheimwort';
+const UNGUELTIG = [
+  `url:https://nutzer:${ZUGANG}@api.example.org/v1?token=abcdefabcdefabcdefab`,
+  'url:10.0.0.5',
+  'url:intern-host',
+  `url:API.EXAMPLE.ORG`,
+  'host:Gross',
+  'env:klein',
+  'pfad:ohne-schraegstrich',
+  'file:',
+  'action:nur-owner',
+  'db:postgresql',
+  'http:api.example.org',
+  'url:' + 'gh' + 'p_' + 'abcdefghijklmnopqrstuvwxyz0123',
+];
+
+test('Regelknoten: ungültige Zielknoten sind in deklariert, ignorieren und erwartet ein Fehler ohne den Wert', () => {
+  for (const ziel of UNGUELTIG) {
+    mitRegeln(`deklariert: http ${ziel} src/a.java — Grund\nignorieren: src/a.java ${ziel} — Grund\nerwartet: http ${ziel}\n`, r => {
+      assert.equal(r.fehler.length, 3, ziel);
+      assert.deepEqual([r.deklariert, r.ignorieren, r.erwartet], [[], [], []], ziel);
+      for (const f of r.fehler) {
+        assert.ok(!f.includes(ZUGANG) && !f.includes(ziel), `${ziel}: ${f}`);
+      }
+    });
+  }
+});
+
+test('Regelknoten: je Präfix ein gültiger Knoten wird angenommen', () => {
+  const gueltig = ['url:api.example.org', 'url:api.example.org:8443', 'host:geo-service', 'host:geo-service:8083', 'db:postgresql@postgres',
+    'db:unbekannt@db.example.org:5432', 'smtp:smtp.example.org', 'ssh:ssh.example.org:22', 'file:/var/data/export', 'file:/var/data/*',
+    'action:ITMSL/msl-actions', 'env:GEO_SERVICE_URL', 'var:partner-d.base-url', 'pfad:/orders/v1'];
+  for (const ziel of gueltig) {
+    mitRegeln(`deklariert: http ${ziel} src/a.java — Grund\nignorieren: src/a.java ${ziel} — Grund\nerwartet: http ${ziel}\n`, r => {
+      assert.deepEqual(r.fehler, [], ziel);
+      assert.equal(r.deklariert.length + r.ignorieren.length + r.erwartet.length, 3, ziel);
+    });
+  }
+});
+
+test('pflicht: eine Regeldatei ohne erwartet-Zeile ist ein Fehler, mit erwartet oder keine nicht', () => {
+  const opt = { pflicht: true };
+  mitRegeln('# nur Kommentar\nignorieren: a.java url:x.example.org — Grund\n', r => {
+    assert.equal(r.fehler.length, 1);
+    assert.match(r.fehler[0], /erwartet/);
+  }, opt);
+  mitRegeln('erwartet: http env:A_URL\n', r => assert.deepEqual(r.fehler, []), opt);
+  mitRegeln('erwartet: keine — kein Netz\n', r => assert.deepEqual(r.fehler, []), opt);
+  mitRegeln('# nur Kommentar\n', r => assert.deepEqual(r.fehler, []), { pflicht: false });
+});
+
+test('pflicht: eine kaputte erwartet-Zeile erzeugt nur ihren eigenen Fehler', () => {
+  mitRegeln('erwartet: telnet env:A\n', r => assert.equal(r.fehler.length, 1), { pflicht: true });
+});

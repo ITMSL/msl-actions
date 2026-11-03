@@ -38,7 +38,7 @@ test('extract: gültiges JSON ohne Zeilen und Rohliterale, Regeldatei ignoriert 
     const schluessel = ist.kanten.map(k => `${k.art} ${k.ziel}`);
     assert.ok(!schluessel.includes('http url:beispiel.example.org'));
     for (const k of ['db env:DB_URL', 'http env:GEO_SERVICE_URL', 'http url:app.partner-a.example.org', 'http url:preise.partner-b.example.org',
-      'http url:routen.partner-c.example.org', 'http var:partner-d.base-url', 'smtp smtp:smtp.example.org']) assert.ok(schluessel.includes(k), k);
+      'http url:routen.partner-c.example.org', 'http var:partner-d.base-url', 'http var:quarkus.rest-client.ohne-property.url', 'smtp smtp:smtp.example.org']) assert.ok(schluessel.includes(k), k);
   });
 });
 
@@ -178,5 +178,151 @@ test('--repo mit ungültigem Format, unbekanntes Kommando und fehlende Wurzel ge
     assert.equal(lauf(['extract', dir, '--repo', 'ohne-schraegstrich']).code, 3);
     assert.equal(lauf(['frisst', dir, '--repo', 'a/b']).code, 3);
     assert.equal(lauf(['extract', path.join(dir, 'gibt-es-nicht'), '--repo', 'a/b']).code, 3);
+  });
+});
+
+const WERT = 'geheimwort';
+const alles = r => r.out + r.err;
+
+test('deklariert mit Zugangsdaten, Roh-IP oder Kurzhost ist ein Regelfehler ohne den Wert, ist.json bleibt aus', () => {
+  for (const ziel of [`url:https://nutzer:${WERT}@api.example.org/v1?token=abcdefabcdefabcdefab`, 'url:10.0.0.5', 'url:intern-host']) {
+    mitKopie('quarkus', dir => {
+      writeFileSync(regelDatei(dir), `deklariert: http ${ziel} src/a.java — Grund\nerwartet: keine — test\n`);
+      for (const kmd of ['extract', 'update', 'check']) {
+        const r = lauf([kmd, dir, '--repo', 'x/y']);
+        assert.equal(r.code, 1, `${kmd} ${ziel}`);
+        assert.match(r.err, /REGEL: Z\.1:/);
+        assert.ok(!alles(r).includes(WERT) && !alles(r).includes('10.0.0.5') && !alles(r).includes('intern-host'), kmd);
+      }
+      assert.ok(!existsSync(istJson(dir)));
+    });
+  }
+});
+
+test('Regeldatei ohne erwartet-Zeile: check Exit 1 mit einer und mit null Kanten, update bleibt lauffähig', () => {
+  mitKopie('node-astro', dir => {
+    mkdirSync(path.dirname(regelDatei(dir)), { recursive: true });
+    writeFileSync(regelDatei(dir), '# nur ein Kommentar\n');
+    const r = lauf(['check', dir, '--repo', 'x/y']);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /REGEL: .*erwartet/);
+  });
+  mitKopie(null, dir => {
+    writeFileSync(path.join(dir, 'package.json'), '{ "name": "leer" }\n');
+    mkdirSync(path.dirname(regelDatei(dir)), { recursive: true });
+    writeFileSync(regelDatei(dir), '# nur ein Kommentar\n');
+    assert.equal(lauf(['check', dir, '--repo', 'x/y']).code, 1);
+    assert.equal(lauf(['update', dir, '--repo', 'x/y']).code, 0);
+    assert.equal(lauf(['check', dir, '--repo', 'x/y']).code, 1);
+  });
+});
+
+test('Vorlage von update für ein Repo ohne Kante erfüllt die Regel', () => {
+  mitKopie(null, dir => {
+    writeFileSync(path.join(dir, 'package.json'), '{ "name": "leer" }\n');
+    assert.equal(lauf(['update', dir, '--repo', 'x/y']).code, 0);
+    assert.equal(lauf(['check', dir, '--repo', 'x/y']).code, 0);
+  });
+});
+
+test('check bei neuer Kante: Diff-Zeile, dazu Datei, Zeile und reduziertes Literal, ohne Query', () => {
+  mitKopie('quarkus', dir => {
+    assert.equal(lauf(['update', dir, '--repo', 'x/y']).code, 0);
+    const app = path.join(dir, 'src', 'main', 'java', 'App.java');
+    const alt = readFileSync(app, 'utf8');
+    writeFileSync(app, alt + '// https://neu.example.org/pfad?lang=de#kopf\n');
+    const zeile = alt.split('\n').length;
+    const r = lauf(['check', dir, '--repo', 'x/y']);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /^\+ http url:neu\.example\.org$/m);
+    assert.ok(r.err.includes(`src/main/java/App.java:${zeile} http url:neu.example.org [https://neu.example.org/pfad]`), r.err);
+    assert.ok(!r.err.includes('lang=de') && !r.err.includes('kopf'));
+  });
+});
+
+test('check: Knoten nur in ist.json ist keine reine Formatabweichung', () => {
+  mitKopie('quarkus', dir => {
+    lauf(['update', dir, '--repo', 'x/y']);
+    const ist = JSON.parse(readFileSync(istJson(dir), 'utf8'));
+    ist.knoten.push('url:zusatz.example.org');
+    writeFileSync(istJson(dir), JSON.stringify(ist, null, 2) + '\n');
+    const r = lauf(['check', dir, '--repo', 'x/y']);
+    assert.equal(r.code, 1);
+    assert.match(r.err, /^- knoten=url:zusatz\.example\.org$/m);
+    assert.ok(!r.err.includes('Formatierung'));
+  });
+});
+
+test('check: Windows-Zeilenenden in ist.json machen den Lauf nicht rot', () => {
+  mitKopie('quarkus', dir => {
+    lauf(['update', dir, '--repo', 'x/y']);
+    writeFileSync(istJson(dir), readFileSync(istJson(dir), 'utf8').replace(/\n/g, '\r\n'));
+    assert.equal(lauf(['check', dir, '--repo', 'x/y']).code, 0);
+  });
+});
+
+test('Konflikt zweier Erkenner: Exit 3, die Meldung nennt Datei und Zeile, nie den Wert', () => {
+  mitKopie('node-astro', dir => {
+    const u = `https://nutzer:${WERT}@x.example.org/s.js`;
+    writeFileSync(path.join(dir, 'src', 'pages', 'konflikt.astro'), `<script src="${u}"></script><script>fetch('${u}')</script>\n`);
+    const r = lauf(['extract', dir, '--repo', 'x/y']);
+    assert.equal(r.code, 3, alles(r));
+    assert.match(r.err, /KONFLIKT: .*konflikt\.astro:1/);
+    assert.ok(!alles(r).includes(WERT) && !alles(r).includes('nutzer'));
+  });
+});
+
+test('unerwartete Ausnahme: Exit 3', () => {
+  mitKopie(null, dir => {
+    const datei = path.join(dir, 'keine-wurzel.txt');
+    writeFileSync(datei, 'x');
+    assert.equal(lauf(['extract', datei, '--repo', 'x/y']).code, 3);
+  });
+});
+
+test('Exit-Code-Priorität: Guard-Fehler zusammen mit Regelfehler gibt Exit 2', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(path.join(dir, 'src', 'main', 'java', 'Geheim.java'), '// https://' + 'benutzer:' + WERT + '@host.example.org/x\n');
+    writeFileSync(regelDatei(dir), 'ignorieren: kaputt\n');
+    const r = lauf(['extract', dir, '--repo', 'x/y']);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /REGEL:/);
+    assert.match(r.err, /SECRET:/);
+  });
+  mitKopie('oeffentlich-rot', dir => {
+    mkdirSync(path.dirname(regelDatei(dir)), { recursive: true });
+    writeFileSync(regelDatei(dir), 'ignorieren: kaputt\n');
+    const r = lauf(['extract', dir, '--repo', 'x/y', '--oeffentlich']);
+    assert.equal(r.code, 2);
+    assert.match(r.err, /REGEL:/);
+    assert.match(r.err, /FORM:/);
+  });
+});
+
+function actionSkript() {
+  const zeilen = readFileSync(path.join(aktion, 'action.yml'), 'utf8').split(/\r?\n/);
+  const i = zeilen.findIndex(z => /^\s+run: \|\s*$/.test(z));
+  assert.ok(i >= 0, 'run-Block fehlt');
+  const einzug = /^\s*/.exec(zeilen[i + 1])[0].length;
+  const block = [];
+  for (const z of zeilen.slice(i + 1)) { if (z.trim() && !z.startsWith(' '.repeat(einzug))) break; block.push(z.slice(einzug)); }
+  return block.join('\n') + '\n';
+}
+
+test('action.yml: run-Block gibt bei privat Exit 0, bei false und leer Exit 2 (Form-Guard)', () => {
+  mitKopie('oeffentlich-rot', dir => {
+    mkdirSync(path.dirname(regelDatei(dir)), { recursive: true });
+    writeFileSync(regelDatei(dir), 'erwartet: http host:geo-service:8083\n');
+    assert.equal(lauf(['update', dir, '--repo', 'x/y']).code, 0);
+    const skript = path.join(dir, 'aktion.sh');
+    writeFileSync(skript, actionSkript());
+    const ausfuehren = privat => spawnSync('bash', [skript], {
+      encoding: 'utf8',
+      env: { ...process.env, REPO_PRIVAT: privat, REPO_NAME: 'x/y', AKTION: aktion.replace(/\\/g, '/'), PFAD: dir.replace(/\\/g, '/') },
+    });
+    const a = ausfuehren('true');
+    assert.equal(a.status, 0, a.stderr);
+    assert.equal(ausfuehren('false').status, 2);
+    assert.equal(ausfuehren('').status, 2);
   });
 });
