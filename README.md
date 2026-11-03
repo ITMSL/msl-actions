@@ -15,6 +15,10 @@ eingebunden wird:
 - **`.github/actions/flyway-guard`** — prüft geänderte Datenbank-Migrationen
   (Flyway-SQL, Liquibase-XML, eigene Migrationsläufer) auf Statements, die
   einen Image-Rollback unmöglich machen würden.
+- **`.github/actions/ist-extraktor`** — prüft die eingecheckte
+  `docs/architektur/ist.json` gegen den Code des aufrufenden Repos (ausgehende
+  Verbindungen, Secret-Guard, Form-Guard für öffentliche Repos). Node 24, keine
+  Abhängigkeiten. Siehe dessen README.
 - **`.github/workflows/deploy-stack.yml`** — wiederverwendbarer
   Deploy-Workflow: löst die Zielversion auf, baut eine Vorschau, ruft per SSH
   ein serverseitig fest gebundenes Deploy-Kommando auf und verifiziert das
@@ -41,3 +45,16 @@ Dieses Repo ist auf den internen Gebrauch durch MSL-Repositories
 zugeschnitten (Namenskonventionen, Version-/Release-Schema, unterstützte
 Migrationswerkzeuge). Es steht öffentlich, damit Dependabot es erreichen
 kann — nicht als allgemein wiederverwendbares Actions-Paket für Dritte.
+
+### Ist-Extraktor
+
+Ein Aufruf je Repo in einem Prüf-Job, auf einen Commit-SHA gepinnt:
+
+```yaml
+- uses: actions/checkout@v7
+- uses: ITMSL/msl-actions/.github/actions/ist-extraktor@<sha>
+```
+
+Das Repo braucht `docs/architektur/ist.json` und `docs/architektur/ist-regeln.md`.
+Beides legt `archify-ist update` an; Regelsyntax, Exit-Codes und die lokale
+Reparatur stehen in `.github/actions/ist-extraktor/README.md`.

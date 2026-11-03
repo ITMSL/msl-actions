@@ -1,0 +1,24 @@
+name: 'Ist-Extraktor'
+description: 'Prueft docs/architektur/ist.json gegen den Code (Architektur Welle 3).'
+inputs:
+  pfad:
+    description: 'Repo-Wurzel'
+    default: '.'
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v5
+      with:
+        node-version: 24
+    - shell: bash
+      env:
+        REPO_PRIVAT: ${{ github.event.repository.private }}
+        REPO_NAME: ${{ github.repository }}
+        AKTION: ${{ github.action_path }}
+        PFAD: ${{ inputs.pfad }}
+      run: |
+        set -euo pipefail
+        oeffentlich="--oeffentlich"
+        if [ "$REPO_PRIVAT" = "true" ]; then oeffentlich=""; fi
+        # shellcheck disable=SC2086
+        node "$AKTION/bin/archify-ist.mjs" check "$PFAD" --repo "$REPO_NAME" $oeffentlich

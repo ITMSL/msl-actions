@@ -33,6 +33,27 @@ jobs:
         run: bash .github/scripts/deploy-stack/vorschau.test.sh
       - name: Deploy-Stack Verifikation testen
         run: bash .github/scripts/deploy-stack/verifizieren.test.sh
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Ist-Extraktor Modell testen
+        run: node --test '.github/actions/ist-extraktor/test/modell.test.mjs'
+      - name: Ist-Extraktor Normalisierung testen
+        run: node --test '.github/actions/ist-extraktor/test/normalisierung.test.mjs'
+      - name: Ist-Extraktor Secret-Guard testen
+        run: node --test '.github/actions/ist-extraktor/test/secret-guard.test.mjs'
+      - name: Ist-Extraktor generische Suche testen
+        run: node --test '.github/actions/ist-extraktor/test/generisch.test.mjs'
+      - name: Ist-Extraktor Extraktion testen
+        run: node --test '.github/actions/ist-extraktor/test/extraktion.test.mjs'
+      - name: Ist-Extraktor Quarkus-Fixture testen
+        run: node --test '.github/actions/ist-extraktor/test/quarkus.test.mjs'
+      - name: Ist-Extraktor Node/Astro-Fixture testen
+        run: node --test '.github/actions/ist-extraktor/test/node-astro.test.mjs'
+      - name: Ist-Extraktor Regeln testen
+        run: node --test '.github/actions/ist-extraktor/test/regeln.test.mjs'
+      - name: Ist-Extraktor CLI testen
+        run: node --test '.github/actions/ist-extraktor/test/cli.test.mjs'
       - name: actionlint
         run: docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.7 -color
       - name: shellcheck der extrahierten Skripte
