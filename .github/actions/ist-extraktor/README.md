@@ -39,6 +39,8 @@ archify-ist --version
 - `check`: vergleicht den Code mit der eingecheckten Datei und verlangt die
   Regeldatei. Abweichungen erscheinen als `+ <Zeile>` (im Code, nicht in der
   Datei) und `- <Zeile>` (in der Datei, nicht mehr im Code).
+  Zu neuen Kanten nennt `check` unter „Fundstellen im Code“ Datei, Zeile und das
+  bereinigte Literal (ohne Zugangsdaten, Query, Fragment).
 - `--repo` fehlt: erst `GITHUB_REPOSITORY`, dann der `origin`-Remote des Repos
   (ohne Zugangsdaten), sonst Exit 3.
 
@@ -61,6 +63,11 @@ erwartet: db env:DB_URL — Datenbank
   der Extraktor nicht sehen kann (Quelle `deklariert`).
 - `erwartet: <art> <Zielknoten>` ist die Positivkontrolle: Fehlt die Kante,
   ist das ein Fehler. Weitere, nicht aufgeführte Kanten sind erlaubt.
+- Zielknoten in allen Regeln werden eng geprüft (`url:` nur kleingeschriebener
+  vollständiger Domainname, `env:` nur Großbuchstaben, Ziffern, Unterstrich usw.)
+  und laufen durch den Secret-Guard; Verstöße sind ein `REGEL`-Fehler.
+- Bei `check` braucht die Regeldatei mindestens eine `erwartet:`-Zeile oder
+  `erwartet: keine — <Grund>`.
 - `erwartet: keine — <Grund>` sagt, dass das Repo keine Kante haben darf. Es
   darf nicht zusammen mit anderen `erwartet:`-Zeilen stehen.
 
