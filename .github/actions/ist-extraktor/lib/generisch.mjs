@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const URL_RE = /\bhttps?:\/\/[^\s"'`<>)\]},;]+/g;
+const URL_RE = /\bhttps?:\/\/[^\s"'`<>)\]},;$]+/g;
 const SCHLUESSEL_RE = /^\s*(%[a-z]+\.)?([A-Za-z0-9_.\-]*(?:url|uri|host|endpoint|base|dsn)[A-Za-z0-9_.\-]*)\s*[=:]\s*(.+?)\s*$/i;
 const KONFIG = /\.(properties|ya?ml|env|toml|cfg|conf)$/i;
 const NICHT_PROD = /^\s*%(dev|test)\./;

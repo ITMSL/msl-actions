@@ -14,7 +14,7 @@ const ERKENNER = { quarkus, node, astro };
 export function vereinigeTreffer(listen) {
   const map = new Map();
   for (const { rang, treffer } of listen) for (const t of treffer) {
-    const id = `${t.datei}:${t.zeile}:${t.schluessel ?? t.rohwert}`;
+    const id = `${t.datei}:${t.zeile}:${t.rohwert ?? t.pfad ?? t.schluessel}`;
     const alt = map.get(id);
     if (!alt) { map.set(id, { ...t, rang }); continue; }
     if ((alt.art ?? 'http') !== (t.art ?? 'http') && alt.rang === rang) {
@@ -36,14 +36,17 @@ export function trefferZuKanten(treffer, { laufausgabe = [] } = {}) {
   const out = [];
   for (const t of treffer) {
     const art = t.art ?? 'http', beleg = { datei: t.datei, schluessel: t.schluessel ?? '(literal)' }, quelle = t.quelle ?? 'code';
+    const roh = t.pfad ?? t.rohwert;
+    if (roh != null) {
+      const g = pruefeRohwert(roh);
+      if (g.status === 'geheimnis' || g.status === 'url_anteil') {
+        const e = new Error(`Secret-Guard (${g.grund}) in ${t.datei}:${t.zeile}`);
+        e.code = 'SECRET';
+        throw e;
+      }
+    }
     if (t.pfad) { out.push(kante(art, 'pfad:' + pfadPraefix(t.pfad), beleg, quelle)); continue; }
     if (t.rohwert == null) { out.push(kante(art, t.env ? `env:${t.env}` : `var:${t.schluessel ?? 'unbekannt'}`, beleg, quelle)); continue; }
-    const g = pruefeRohwert(t.rohwert);
-    if (g.status === 'geheimnis' || g.status === 'url_anteil') {
-      const e = new Error(`Secret-Guard (${g.grund}) in ${t.datei}:${t.zeile}`);
-      e.code = 'SECRET';
-      throw e;
-    }
     const ziel = zielknoten(art, t.rohwert);
     if (!ziel) { laufausgabe.push(`verworfen ${t.datei}:${t.zeile} ${t.schluessel ?? ''}`); continue; }
     laufausgabe.push(`${t.datei}:${t.zeile} ${art} ${ziel} (${t.schluessel ?? 'literal'})`);

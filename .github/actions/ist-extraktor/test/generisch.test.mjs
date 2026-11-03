@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import os from 'node:os';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { textDateien } from '../lib/dateien.mjs';
 import { generischeTreffer } from '../lib/generisch.mjs';
 
 function mitDateien(dateien, fn) {
@@ -39,5 +41,38 @@ test('URL-Literal aus .md/.java liefert Treffer, in .properties nur über den Sc
     assert.deepEqual(je('A.java').map(x => x.rohwert), ['https://j.example.org/v1']);
     assert.equal(je('d.properties').length, 1);
     assert.equal(je('d.properties')[0].schluessel, 'partner.url');
+  });
+});
+
+
+function mitBaum(dateien, fn) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-baum-'));
+  try {
+    for (const [name, inhalt] of Object.entries(dateien)) {
+      mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+      writeFileSync(path.join(dir, name), inhalt);
+    }
+    return fn(dir);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('Doku, Lockfiles und XML werden nicht gescannt, HTML und JSON außerhalb docs/ schon', () => {
+  const url = 'https://x.example.org/p\n';
+  mitBaum({
+    'README.md': url, 'docs/hinweis.json': url, 'doc/a.html': url, 'package-lock.json': url, 'sub/yarn.lock': url,
+    'pom.xml': url, 'seite.html': url, 'stil.json': url, 'src/A.java': url,
+  }, dir => {
+    assert.deepEqual(textDateien(dir), ['seite.html', 'src/A.java', 'stil.json']);
+    const t = generischeTreffer(dir, textDateien(dir), new Set());
+    assert.deepEqual(t.map(x => x.datei).sort(), ['seite.html', 'src/A.java', 'stil.json']);
+  });
+});
+test('mit .git zählen nur getrackte Dateien, ohne .git der Dateisystem-Lauf', () => {
+  mitBaum({ 'a.js': 'x\n', 'b.js': 'y\n', '.env': 'u.url=https://geheim.example.org\n', 'sub/c.js': 'z\n' }, dir => {
+    assert.deepEqual(textDateien(dir), ['.env', 'a.js', 'b.js', 'sub/c.js']);
+    execFileSync('git', ['init', '-q', dir]);
+    execFileSync('git', ['-C', dir, 'add', 'a.js', 'b.js', 'sub/c.js']);
+    rmSync(path.join(dir, 'b.js'));
+    assert.deepEqual(textDateien(dir), ['a.js', 'sub/c.js']);
   });
 });

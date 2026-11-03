@@ -30,3 +30,21 @@ test('vereinigeTreffer: höherer Rang gewinnt, gleicher Rang mit anderer Art wir
   assert.equal(vereinigeTreffer([{ rang: 2, treffer: [e] }, { rang: 1, treffer: [g] }])[0].art, 'smtp');
   assert.throws(() => vereinigeTreffer([{ rang: 2, treffer: [g] }, { rang: 2, treffer: [e] }]), x => x.code === 'KONFLIKT');
 });
+
+const ghToken = 'gh' + 'p_' + 'abcdefghijklmnopqrstuvwxyz0123';
+test('geheimnis und url_anteil werfen SECRET', () => {
+  for (const rohwert of ['https://x.example.org/?a=' + ghToken, 'https://u:pw@x.example.org/', 'https://x.example.org/hooks/Zq9vL2mN8kP4rT6wY1bC3dF7gH'])
+    assert.throws(() => trefferZuKanten([{ datei: 'a', zeile: 1, schluessel: 'k', rohwert, art: 'http' }]), e => e.code === 'SECRET', rohwert);
+});
+test('relative Pfade laufen durch den Secret-Guard', () => {
+  for (const pfad of ['/' + ghToken + '/x', '/x?token=abcdefabcdefabcdefab', '/hooks/Zq9vL2mN8kP4rT6wY1bC3dF7gH/run'])
+    assert.throws(() => trefferZuKanten([{ datei: 'a.ts', zeile: 1, schluessel: 'fetch', rohwert: null, pfad, art: 'http' }]), e => e.code === 'SECRET', pfad);
+});
+test('Treffer-Id: zwei relative Pfade je Zeile bleiben, Erkenner verdrängt generischen Treffer mit gleichem Rohwert', () => {
+  const p1 = { datei: 'a.ts', zeile: 1, schluessel: 'fetch', rohwert: null, pfad: '/a/x', art: 'http' }, p2 = { ...p1, pfad: '/b/y' };
+  assert.equal(vereinigeTreffer([{ rang: 2, treffer: [p1, p2] }]).length, 2);
+  const erk = { datei: 'a.astro', zeile: 3, schluessel: null, rohwert: 'https://x.example.org/s.js', art: 'script' };
+  const gen = { datei: 'a.astro', zeile: 3, schluessel: null, rohwert: 'https://x.example.org/s.js' };
+  const r = vereinigeTreffer([{ rang: 2, treffer: [{ ...erk, schluessel: 'script-src' }] }, { rang: 1, treffer: [gen] }]);
+  assert.equal(r.length, 1); assert.equal(r[0].art, 'script');
+});

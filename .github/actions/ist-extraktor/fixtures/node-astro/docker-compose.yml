@@ -5,7 +5,12 @@ services:
       - GEO_SERVICE_URL=http://geo-service:8083
       - SECRET_X=abc
       - API_TOKEN_URL=https://token.example.org/x
+      - PARTNER_F_URL=${PARTNER_F_URL:-https://partner-f.example.org/api}
+      - PARTNER_G_URL=${PARTNER_G_URL}
+    healthcheck:
+      test: ["CMD", "curl", "http://localhost:8080/health"]
   worker:
     image: example/worker:1
     environment:
       API_TOKEN_URL: https://token.example.org/y
+      PARTNER_E_URL: http://partner-e:9000

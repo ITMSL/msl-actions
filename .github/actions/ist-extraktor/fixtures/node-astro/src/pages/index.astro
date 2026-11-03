@@ -5,6 +5,11 @@ const titel = 'Start';
   <head>
     <script src="https://challenges.example.org/turnstile/v0/api.js"></script>
     <link href="https://fonts.example.org/css2?family=Inter&display=swap" rel="stylesheet" />
+    <script is:inline async src={`https://tag.example.org/gtag/js?id=${ID}`}></script>
+    <script src={`https://${HOST}/lib.js`}></script>
   </head>
-  <body><h1>{titel}</h1></body>
+  <body><h1>{titel}</h1>
+    <script>const s = document.createElement('script'); s.src = 'https://challenges.example.org/turnstile/v0/api.js'; document.head.appendChild(s);</script>
+    <script>const i = document.createElement('iframe'); i.src = 'https://frame.example.org/embed';</script>
+  </body>
 </html>

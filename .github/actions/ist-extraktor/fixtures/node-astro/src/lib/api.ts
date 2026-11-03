@@ -5,3 +5,6 @@ export const c = () => axios.create({ baseURL: 'https://push.example.org/1' });
 export const d = () => fetch('https://code.example.org/repos');
 export const e = () => new URL('https://monitor.example.org/health');
 const h = process.env.HOST;
+const k = process.env.PARTNER_H_URL;
+export const f = () => fetch(`${cfg.base}/ping`);
+export const g = () => [fetch('/a/v2/x'), fetch('/b/y')];
