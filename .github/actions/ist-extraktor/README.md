@@ -15,6 +15,10 @@ Zeitstempel, keinen Commit, keine Rohwerte.
 - uses: ITMSL/msl-actions/.github/actions/ist-extraktor@<sha>
 ```
 
+Die Action setzt Node 24 für alle Folgeschritte des Jobs. Deshalb steht sie
+**nach dem Checkout und vor dem eigenen `setup-node`** des Jobs, oder in einem
+eigenen Job.
+
 Immer auf einen Commit-SHA pinnen, nie auf `@main`. Eingabe `pfad` (Standard
 `.`) ist die Repo-Wurzel. Die Action ruft `check` auf. Ist
 `github.event.repository.private` nicht ausdrücklich `true`, gilt das Repo als
@@ -44,6 +48,19 @@ archify-ist --version
 - `--repo` fehlt: erst `GITHUB_REPOSITORY`, dann der `origin`-Remote des Repos
   (ohne Zugangsdaten), sonst Exit 3.
 
+## Erstanlage und Rollout in einem Repo
+
+Der Extraktor liest nur git-getrackte Dateien: Neue Dateien erst `git add`, dann
+`update`.
+
+1. `archify-ist extract . --repo <org/name> --diagnose` zeigt die Laufausgabe
+   (Datei, Zeile, Zielknoten, reduziertes Literal).
+2. `archify-ist update . --repo <org/name>` legt `ist.json` und die Vorlage der
+   Regeldatei an.
+3. Rauschen (Kommentare, Beispiel-URLs) als `ignorieren:`-Zeile eintragen und die
+   zugehörige `erwartet:`-Zeile der Vorlage löschen.
+4. Nochmal `update`, dann `check`.
+
 ## Regeldatei `docs/architektur/ist-regeln.md`
 
 Eine Regel je Zeile, alles andere (Überschriften, `#`-Zeilen) wird übersprungen.
@@ -70,6 +87,10 @@ erwartet: db env:DB_URL — Datenbank
   `erwartet: keine — <Grund>`.
 - `erwartet: keine — <Grund>` sagt, dass das Repo keine Kante haben darf. Es
   darf nicht zusammen mit anderen `erwartet:`-Zeilen stehen.
+
+`env` an einer Kante ist immer eine sortierte Liste der Variablennamen; das Feld
+fehlt, wenn keine vorliegen. Die Datei bei `ignorieren:` und `deklariert:` ist ein
+relativer Repo-Pfad (kein `:`, `@`, `?`, `#`, kein führendes `/`, kein `..`).
 
 Kantenarten: `http`, `db`, `smtp`, `ssh`, `file`, `action`, `script`. Zielknoten:
 `host:`, `url:`, `db:<engine>@<host>`, `smtp:`, `ssh:`, `file:`, `action:`,
