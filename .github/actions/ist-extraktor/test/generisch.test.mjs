@@ -77,3 +77,21 @@ test('mit .git zählen nur getrackte Dateien, ohne .git der Dateisystem-Lauf', (
     assert.deepEqual(textDateien(dir), ['a.js', 'sub/c.js']);
   });
 });
+
+test('URL mit $ im Query wird wie bisher vor dem $ geschnitten, mit @ nach dem $ geht der ganze Token weiter', () => {
+  mitDateien({ 'A.java': [
+    '// https://h.example.org/x?id=${ID}',
+    '// https://nutzer:12345$x@h.example.org/',
+    '// https://u:${PW}@h.example.org/x',
+    '// https://h.example.org/p/${ID}/ende',
+    '// siehe https://h.example.org/a und mail@example.org',
+  ].join('\n') + '\n' }, (dir, dateien) => {
+    assert.deepEqual(generischeTreffer(dir, dateien).map(t => t.rohwert), [
+      'https://h.example.org/x?id=',
+      'https://nutzer:12345$x@h.example.org/',
+      'https://u:${PW}@h.example.org/x',
+      'https://h.example.org/p/',
+      'https://h.example.org/a',
+    ]);
+  });
+});

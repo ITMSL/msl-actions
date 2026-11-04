@@ -235,3 +235,62 @@ test('Quarkus-Platzhalter mit führendem Leerzeichen im Default wirft SECRET', (
     assert.ok(!JSON.stringify(r).includes('geheimwort1'));
   });
 });
+
+test('deklariert-Kante verschmilzt mit einer gefundenen Kante gleichen Schlüssels: eine Kante, beide Belege, quelle deklariert', () => {
+  mitKopie('quarkus', dir => {
+    writeFileSync(regelDatei(dir), 'deklariert: http url:routen.partner-c.example.org src/main/java/PartnerCClient.java — zusätzlich gebaut\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    const k = r.ist.kanten.filter(x => x.art === 'http' && x.ziel === 'url:routen.partner-c.example.org');
+    assert.equal(k.length, 1);
+    assert.equal(k[0].quelle, 'deklariert');
+    assert.deepEqual(k[0].belege.map(b => `${b.datei}#${b.schluessel}`), ['src/main/java/App.java#baseUri', 'src/main/java/PartnerCClient.java#deklariert']);
+  });
+});
+
+test('zwei Platzhalter mit gleichem Default ergeben eine Kante mit beiden Namen als Liste', () => {
+  mitKopie('quarkus', dir => {
+    const p = path.join(dir, 'src', 'main', 'resources', 'application.properties');
+    writeFileSync(p, readFileSync(p, 'utf8')
+      + 'eins.url=${EINS_URL:https://zwei-namen.example.org}\nzwei.url=${ZWEI_URL:https://zwei-namen.example.org}\n');
+    const k = extrahiere(dir, { repo: 'a/b' }).ist.kanten.filter(x => x.ziel === 'url:zwei-namen.example.org');
+    assert.equal(k.length, 1);
+    assert.deepEqual(k[0].env, ['EINS_URL', 'ZWEI_URL']);
+  });
+});
+
+function mitCompose(zeile, fn) {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-compose-'));
+  try {
+    writeFileSync(path.join(dir, 'docker-compose.yml'), `services:\n  app:\n    environment:\n      ${zeile}\n`);
+    return fn(dir);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+test('Compose: Leerzeichen in den Quotes oder im Default umgehen den Secret-Guard nicht', () => {
+  for (const zeile of ['- X_URL=" https://nutzer:geheimwort1@h.example.org"', '- X_URL=${X_URL:- https://nutzer:geheimwort1@h.example.org}',
+    "- X_URL=' https://nutzer:geheimwort1@h.example.org '", 'X_URL: "\thttps://nutzer:geheimwort1@h.example.org"']) {
+    mitCompose(zeile, dir => {
+      const r = extrahiere(dir, { repo: 'a/b' });
+      assert.deepEqual(r.fehler.map(f => f.code), ['SECRET'], zeile);
+      assert.ok(!JSON.stringify(r).includes('geheimwort1'), zeile);
+    });
+  }
+});
+
+test('Compose: Leerzeichen um einen harmlosen Wert ändern die Kante nicht', () => {
+  mitCompose('- X_URL=" https://api.example.org/p "', dir => {
+    assert.deepEqual(schluessel(extrahiere(dir, { repo: 'a/b' }).ist), ['http url:api.example.org']);
+  });
+});
+
+test('Userinfo mit Platzhalter oder Dollarzeichen: der ungeschnittene Token geht an den Secret-Guard', () => {
+  for (const zeile of ['// https://nutzer:12345$x@h.example.org/', '// https://u:${PW}@h.example.org/x', '// url = "https://u:${PW}@h.example.org/x"']) {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-userinfo-'));
+    try {
+      writeFileSync(path.join(dir, 'A.java'), zeile + '\n');
+      const r = extrahiere(dir, { repo: 'a/b' });
+      assert.deepEqual(r.fehler.map(f => f.code), ['SECRET'], zeile);
+      assert.ok(!JSON.stringify(r).includes('12345') && !JSON.stringify(r).includes('nutzer'), zeile);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }
+});

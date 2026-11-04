@@ -145,3 +145,17 @@ test('pflicht: eine Regeldatei ohne erwartet-Zeile ist ein Fehler, mit erwartet 
 test('pflicht: eine kaputte erwartet-Zeile erzeugt nur ihren eigenen Fehler', () => {
   mitRegeln('erwartet: telnet env:A\n', r => assert.equal(r.fehler.length, 1), { pflicht: true });
 });
+
+test('Datei-Feld von deklariert und ignorieren muss ein relativer Repo-Pfad sein, Fehler ohne den Wert', () => {
+  const ungueltig = ['https://nutzer:geheimwort@h.example.org/x', '/abs/pfad.java', '../x.java', 'a/../b.java', 'a?b.java', 'a#b.java', 'nutzer@h.java', 'C:/x.java', 'a' + String.fromCharCode(92) + 'b.java'];
+  for (const datei of ungueltig) {
+    mitRegeln(`deklariert: http url:ok.example.org ${datei} — Grund\nignorieren: ${datei} url:ok.example.org — Grund\n`, r => {
+      assert.equal(r.fehler.length, 2, datei);
+      assert.deepEqual([r.deklariert, r.ignorieren], [[], []], datei);
+      for (const f of r.fehler) assert.ok(!f.includes('geheimwort') && !f.includes(datei), `${datei}: ${f}`);
+    });
+  }
+  for (const datei of ['src/main/java/A.java', '.github/workflows/x.yml', 'a..b.java', 'config/andere.properties']) {
+    mitRegeln(`deklariert: http url:ok.example.org ${datei} — Grund\nignorieren: ${datei} url:ok.example.org — Grund\n`, r => assert.deepEqual(r.fehler, [], datei));
+  }
+});

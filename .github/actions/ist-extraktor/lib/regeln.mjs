@@ -10,6 +10,11 @@ function knoten(s) {
   return s;
 }
 
+function dateipfad(s) {
+  if (!/^[^\s:@?#\\]+$/.test(s) || s.startsWith('/') || s.split('/').includes('..')) throw new Error('ungültiger Dateipfad');
+  return s;
+}
+
 function art(s) {
   if (!ARTEN.includes(s)) throw new Error('unbekannte Kantenart');
   return s;
@@ -42,10 +47,10 @@ export function leseRegeln(root, { pflicht = false } = {}) {
         }
       } else if (m[1] === 'ignorieren') {
         if (!grund || teile.length !== 2) throw new Error('ignorieren braucht <Datei> <Zielknoten> — <Grund>');
-        r.ignorieren.push({ datei: teile[0], ziel: knoten(teile[1]), grund });
+        r.ignorieren.push({ datei: dateipfad(teile[0]), ziel: knoten(teile[1]), grund });
       } else {
         if (!grund || teile.length !== 3) throw new Error('deklariert braucht <art> <Zielknoten> <Datei> — <Grund>');
-        r.deklariert.push({ art: art(teile[0]), ziel: knoten(teile[1]), datei: teile[2], grund });
+        r.deklariert.push({ art: art(teile[0]), ziel: knoten(teile[1]), datei: dateipfad(teile[2]), grund });
       }
     } catch (e) { r.fehler.push(`Z.${i + 1}: ${e.message}`); }
   }
