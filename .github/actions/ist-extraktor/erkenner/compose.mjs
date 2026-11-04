@@ -7,7 +7,9 @@ const ZIEL_NAME = /(URL|URI|HOST|ENDPOINT)$/;
 const SMTP_NAME = /MAILER|SMTP|IMAP/;
 const LISTE = /^\s*-\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 const MAP = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+)$/;
-const PLATZHALTER = /^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}$/;
+const JDBC = /^jdbc:[a-z0-9]+:\/\//i;
+const LITERAL = /^(?:https?:\/\/|jdbc:[a-z0-9]+:\/\/)/i;
+const PLATZHALTER =/^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::?-([^}]*))?\}$/;
 
 export function composeTreffer(root, dateien) {
   const out = [];
@@ -24,9 +26,10 @@ export function composeTreffer(root, dateien) {
       const treffer = { datei: d, zeile: i + 1, schluessel: m[1], art: SMTP_NAME.test(m[1]) ? 'smtp' : 'http', quelle: 'compose' };
       const p = PLATZHALTER.exec(wert);
       if (p) p[2] = p[2]?.trim();
-      if (p && /^https?:\/\//.test(p[2] ?? '')) out.push({ ...treffer, rohwert: p[2], env: p[1] });
+      const artVon = roh => (JDBC.test(roh) ? 'db' : treffer.art);
+      if (p && LITERAL.test(p[2] ?? '')) out.push({ ...treffer, art: artVon(p[2]), rohwert: p[2], env: p[1] });
       else if (p && (p[2] ?? '') === '' && ZIEL_NAME.test(m[1])) out.push({ ...treffer, rohwert: null, env: p[1] });
-      else if (/^https?:\/\//.test(wert)) out.push({ ...treffer, rohwert: wert, env: m[1] });
+      else if (LITERAL.test(wert)) out.push({ ...treffer, art: artVon(wert), rohwert: wert, env: m[1] });
     });
   }
   return out;

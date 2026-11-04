@@ -36,6 +36,12 @@ test('Node-Erkenner direkt: exakte Treffermenge', () => {
     `${A} | http | code | cfg.base | - | - | -`,
     `${A} | http | code | PUBLIC_BACKEND_URL | - | PUBLIC_BACKEND_URL | -`,
     `${A} | http | code | PARTNER_H_URL | - | PARTNER_H_URL | -`,
+    `${A} | http | code | opt | - | PUBLIC_OPT_URL | -`,
+    `${A} | http | code | PUBLIC_OPT_URL | - | PUBLIC_OPT_URL | -`,
+    `${A} | http | code | PARTNER_J_URL | - | PARTNER_J_URL | -`,
+    `${A} | http | code | origin | - | PUBLIC_ORIGIN_URL | -`,
+    `${A} | http | code | PUBLIC_ORIGIN_URL | - | PUBLIC_ORIGIN_URL | -`,
+    `${A} | http | code | cfg.root | - | - | -`,
   ];
   assert.deepEqual(nodeTreffer(root, dateien).map(fmt).sort(), erwartetTreffer.sort());
 });
@@ -57,6 +63,8 @@ test('Compose-Erkenner direkt: beide Formen und Default, nichts außerhalb von e
     `${C} | http | compose | PARTNER_E_URL | http://partner-e:9000 | PARTNER_E_URL | -`,
     `${C} | http | compose | PARTNER_I_URL | - | PARTNER_I_URL | -`,
     `${C} | smtp | compose | MAILER_HOST | - | SMTP_HOST | -`,
+    `${C} | db | compose | DB_URL | jdbc:postgresql://db.example.org:5432/x | DB_URL | -`,
+    `${C} | db | compose | QUARKUS_DATASOURCE_JDBC_URL | jdbc:postgresql://postgres:5432/x | QUARKUS_DATASOURCE_JDBC_URL | -`,
   ];
   assert.deepEqual(composeTreffer(root, dateien).map(fmt).sort(), erwartetTreffer.sort());
 });

@@ -356,3 +356,25 @@ test('Quarkus: Zugangsdaten in der zweiten URL einer Liste werfen SECRET ohne de
     }
   }
 });
+
+test('Compose: JDBC-Werte ergeben Art db, auch als Default; Zugangsdaten im JDBC-Wert werfen SECRET', () => {
+  mitCompose('DB_URL: jdbc:postgresql://db.example.org:5432/x', dir => {
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(r.fehler, []);
+    assert.deepEqual(schluessel(r.ist), ['db db:postgresql@db.example.org']);
+    assert.deepEqual(r.ist.kanten[0].env, ['DB_URL']);
+  });
+  mitCompose('- QUARKUS_DATASOURCE_JDBC_URL=${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:postgresql://postgres:5432/x}', dir => {
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(schluessel(r.ist), ['db db:postgresql@postgres']);
+    assert.deepEqual(r.ist.kanten[0].env, ['QUARKUS_DATASOURCE_JDBC_URL']);
+  });
+  for (const zeile of ['DB_URL: jdbc:postgresql://nutzer:geheimwort1@db.example.org:5432/x', '- DB_URL=${DB_URL:-jdbc:postgresql://nutzer:geheimwort1@h.example.org/x}',
+    'DB_URL: jdbc:postgresql://h.example.org/x?user=a&password=geheimwort1']) {
+    mitCompose(zeile, dir => {
+      const r = extrahiere(dir, { repo: 'a/b' });
+      assert.deepEqual(r.fehler.map(f => f.code), ['SECRET'], zeile);
+      assert.ok(!JSON.stringify(r).includes('geheimwort1'), zeile);
+    });
+  }
+});

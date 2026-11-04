@@ -34,7 +34,10 @@ function artAusSchluessel(k) {
   return 'http';
 }
 
-const zeileVon = (src, idx) => src.slice(0, idx).split('\n').length;
+// Namensteile getrennt prüfen (Punkt, Bindestrich, Unterstrich, CamelCase): "courier" enthält "uri" nur als Teilstring
+const ZIEL_TEIL = name => name.replace(/([a-z0-9])([A-Z])/g, '$1.$2').toLowerCase().split(/[.\-_]+/).some(t => /^(?:url|uri|host|base|baseurl)$/.test(t));
+
+const zeileVon =(src, idx) => src.slice(0, idx).split('\n').length;
 
 export function quarkusTreffer(root, dateien) {
   const map = leseProperties(root, dateien), out = [];
@@ -62,8 +65,8 @@ export function quarkusTreffer(root, dateien) {
         out.push({ datei: d, zeile: zeileVon(src, m.index), schluessel: `quarkus.rest-client.${key[1]}.url`, rohwert: null, env: null, art: 'http', quelle: 'code' });
     }
     if (/HttpClient\.newBuilder\(/.test(src))
-      for (const m of src.matchAll(/@ConfigProperty\s*\(\s*name\s*=\s*"([^"]*(?:url|uri|host|base)[^"]*)"/gi))
-        if (!map.has(m[1])) out.push({ datei: d, zeile: zeileVon(src, m.index), schluessel: m[1], rohwert: null, env: null, art: 'http', quelle: 'code' });
+      for (const m of src.matchAll(/@ConfigProperty\s*\(\s*name\s*=\s*"([^"]*)"/g))
+        if (ZIEL_TEIL(m[1]) && !map.has(m[1])) out.push({ datei: d, zeile: zeileVon(src, m.index), schluessel: m[1], rohwert: null, env: null, art: 'http', quelle: 'code' });
   }
   return out;
 }

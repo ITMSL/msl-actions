@@ -62,3 +62,24 @@ test('Quarkus-Erkenner direkt: Listen mit Komma oder Leerzeichen werden je URL z
     ]);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('Quarkus-Erkenner direkt: @ConfigProperty prüft die Namensteile, nicht Teilstrings (courier enthält uri)', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-quarkus-cp-'));
+  try {
+    const rel = 'src/main/java/A.java';
+    mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    writeFileSync(path.join(dir, rel), [
+      'class A {',
+      '  HttpClient c = HttpClient.newBuilder().build();',
+      '  @ConfigProperty(name = "partner.courier.flag") String f;',
+      '  @ConfigProperty(name = "partner.hostile.flag") String g;',
+      '  @ConfigProperty(name = "partner.baseUrl") String b;',
+      '  @ConfigProperty(name = "partner.Host") String h;',
+      '  @ConfigProperty(name = "partner.api_uri") String u;',
+      '  @ConfigProperty(name = "partner.base-url") String d;',
+      '  @ConfigProperty(name = "partner.apiUrl") String e;',
+      '}',
+    ].join('\n') + '\n');
+    assert.deepEqual(quarkusTreffer(dir, [rel]).map(t => t.schluessel), ['partner.baseUrl', 'partner.Host', 'partner.api_uri', 'partner.base-url', 'partner.apiUrl']);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

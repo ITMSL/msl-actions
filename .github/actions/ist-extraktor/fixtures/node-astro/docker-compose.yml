@@ -17,3 +17,5 @@ services:
       API_TOKEN_URL: https://token.example.org/y
       PARTNER_E_URL: http://partner-e:9000
       MAILER_HOST: ${SMTP_HOST}
+      DB_URL: jdbc:postgresql://db.example.org:5432/x
+      QUARKUS_DATASOURCE_JDBC_URL: ${QUARKUS_DATASOURCE_JDBC_URL:-jdbc:postgresql://postgres:5432/x}
