@@ -334,12 +334,13 @@ function mitQuarkusZeilen(zeilen, fn) {
 
 test('Quarkus: Listen mit Komma oder Leerzeichen ergeben je URL eine Kante, auch unter url-artigem Schlüssel', () => {
   mitQuarkusZeilen(['cors.origins=https://a.example.org,https://b.example.org', 'foo.liste=https://c.example.org https://d.example.org',
-    'x.urls=https://e.example.org,https://f.example.org', 'foo.hostvar=https://${HOST}/x'], dir => {
+    'x.urls=https://e.example.org,https://f.example.org', 'foo.hostvar=https://${HOST}/x', 'kein.ziel=ohne adresse', 'platz.nix=${NUR_ENV}'], dir => {
     const r = extrahiere(dir, { repo: 'a/b' });
     assert.deepEqual(r.fehler, []);
     const ziele = r.ist.kanten.map(k => k.ziel);
     for (const h of 'abcdef') assert.ok(ziele.includes(`url:${h}.example.org`), h);
     assert.ok(ziele.includes('var:foo.hostvar'));
+    assert.ok(!ziele.some(z => z.includes('NUR_ENV') || z.includes('kein.ziel') || z.includes('platz.nix')), ziele.join());
     assert.ok(!r.laufausgabe.some(z => /verworfen .*application\.properties/.test(z)), r.laufausgabe.join('\n'));
   });
 });
