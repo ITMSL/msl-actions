@@ -38,3 +38,27 @@ test('Quarkus-Erkenner direkt: exakte Treffermenge ohne generische Suche', () =>
   ];
   assert.deepEqual(quarkusTreffer(root, textDateien(root)).map(fmt).sort(), erwartetTreffer.sort());
 });
+
+import os from 'node:os';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+test('Quarkus-Erkenner direkt: Listen mit Komma oder Leerzeichen werden je URL zerlegt, ein einzelnes Literal mit Platzhalter bleibt ganz', () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ist-quarkus-liste-'));
+  try {
+    const rel = 'src/main/resources/application.properties';
+    mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    writeFileSync(path.join(dir, rel), [
+      'cors.origins=https://a.example.org,https://b.example.org',
+      'foo.liste=https://c.example.org https://d.example.org',
+      'x.urls=https://e.example.org,https://f.example.org',
+      'foo.hostvar=https://${HOST}/x',
+      'foo.einzeln=https://g.example.org/p',
+    ].join('\n') + '\n');
+    assert.deepEqual(quarkusTreffer(dir, [rel]).map(t => `${t.schluessel}|${t.rohwert}`), [
+      'cors.origins|https://a.example.org', 'cors.origins|https://b.example.org',
+      'foo.liste|https://c.example.org', 'foo.liste|https://d.example.org',
+      'x.urls|https://e.example.org', 'x.urls|https://f.example.org',
+      'foo.hostvar|https://${HOST}/x',
+      'foo.einzeln|https://g.example.org/p',
+    ]);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

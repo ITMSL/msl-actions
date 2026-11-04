@@ -323,3 +323,35 @@ test('Quarkus: Literal mit Zugangsdaten unter beliebigem Schlüssel wirft SECRET
     assert.ok(!JSON.stringify(r).includes('geheimwort1'));
   });
 });
+
+function mitQuarkusZeilen(zeilen, fn) {
+  mitKopie('quarkus', dir => {
+    const p = path.join(dir, 'src', 'main', 'resources', 'application.properties');
+    writeFileSync(p, readFileSync(p, 'utf8') + zeilen.join('\n') + '\n');
+    return fn(dir);
+  });
+}
+
+test('Quarkus: Listen mit Komma oder Leerzeichen ergeben je URL eine Kante, auch unter url-artigem Schlüssel', () => {
+  mitQuarkusZeilen(['cors.origins=https://a.example.org,https://b.example.org', 'foo.liste=https://c.example.org https://d.example.org',
+    'x.urls=https://e.example.org,https://f.example.org', 'foo.hostvar=https://${HOST}/x'], dir => {
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(r.fehler, []);
+    const ziele = r.ist.kanten.map(k => k.ziel);
+    for (const h of 'abcdef') assert.ok(ziele.includes(`url:${h}.example.org`), h);
+    assert.ok(ziele.includes('var:foo.hostvar'));
+    assert.ok(!r.laufausgabe.some(z => /verworfen .*application\.properties/.test(z)), r.laufausgabe.join('\n'));
+  });
+});
+
+test('Quarkus: Zugangsdaten in der zweiten URL einer Liste werfen SECRET ohne den Wert', () => {
+  for (const schluessel of ['foo.geheim', 'foo.url']) {
+    for (const trenner of [',', ' ']) {
+      mitQuarkusZeilen([`${schluessel}=https://g.example.org${trenner}https://nutzer:geheimwort1@h.example.org/x`], dir => {
+        const r = extrahiere(dir, { repo: 'a/b' });
+        assert.deepEqual(r.fehler.map(f => f.code), ['SECRET'], `${schluessel} ${JSON.stringify(trenner)}`);
+        assert.ok(!JSON.stringify(r).includes('geheimwort1') && !JSON.stringify(r).includes('nutzer'));
+      });
+    }
+  }
+});

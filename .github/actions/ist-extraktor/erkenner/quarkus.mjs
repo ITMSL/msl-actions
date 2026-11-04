@@ -40,13 +40,16 @@ export function quarkusTreffer(root, dateien) {
   const map = leseProperties(root, dateien), out = [];
   for (const [k, v] of map) {
     const r = aufloesen(v.wert, map);
-    if (!/(url|uri|host|base-url|endpoint|jdbc\.url|erlaubte-hosts)$/i.test(k)) {
-      // beliebiger Schlüssel: nur ein http(s)-Literal im aufgelösten Wert zählt
-      const w = (r.wert ?? '').trim();
-      for (const u of /^https?:\/\//.test(w) ? [w] : urlLiterale(w))
-        out.push({ datei: v.datei, zeile: v.zeile, schluessel: k, rohwert: u, env: r.env, art: 'http', quelle: 'config' });
+    const urlSchluessel = /(url|uri|host|base-url|endpoint|jdbc\.url|erlaubte-hosts)$/i.test(k);
+    // genau ein Literal ohne Komma und Leerraum bleibt ganz (auch mit Platzhalter), alles andere wird je URL zerlegt
+    const w = (r.wert ?? '').trim(), einzeln = /^https?:\/\/[^\s,]*$/.test(w);
+    const literale = einzeln ? [w] : urlLiterale(w);
+    if (literale.length && (!urlSchluessel || !einzeln)) {
+      for (const u of literale)
+        out.push({ datei: v.datei, zeile: v.zeile, schluessel: k, rohwert: u, env: r.env, art: urlSchluessel ? artAusSchluessel(k) : 'http', quelle: 'config' });
       continue;
     }
+    if (!urlSchluessel) continue;
     out.push({ datei: v.datei, zeile: v.zeile, schluessel: k, rohwert: r.wert, env: r.env, art: artAusSchluessel(k), quelle: 'config' });
   }
   for (const d of dateien.filter(d => /\.java$/.test(d) && d.includes('src/main/'))) {
