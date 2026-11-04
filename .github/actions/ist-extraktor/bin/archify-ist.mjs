@@ -62,7 +62,7 @@ function abbild(ist) {
     const s = `${k.art} ${k.ziel}`, dazu = text => z.push({ text, kante: s });
     dazu(s);
     dazu(`${s} quelle=${k.quelle}`);
-    if (k.env) dazu(`${s} env=${k.env}`);
+    for (const e of k.env ?? []) dazu(`${s} env=${e}`);
     for (const b of k.belege) dazu(`${s} beleg=${b.datei}#${b.schluessel}`);
   }
   return z;

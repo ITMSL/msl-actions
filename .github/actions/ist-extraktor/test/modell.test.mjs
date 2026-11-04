@@ -25,7 +25,7 @@ test('Zusammenführen behält env und die spezifischste Quelle', () => {
       kante('http', 'url:app.partner-a.example.org', { datei: 'application.properties', schluessel: 'partner-a.url' }, 'config', 'PARTNER_A_URL'),
     ] });
   assert.equal(ist.kanten.length, 1);
-  assert.equal(ist.kanten[0].env, 'PARTNER_A_URL');
+  assert.deepEqual(ist.kanten[0].env, ['PARTNER_A_URL']);
   assert.equal(ist.kanten[0].quelle, 'config');
   assert.equal(ist.kanten[0].belege.length, 2);
   const umgekehrt = kanonisch({ repo: 'ITMSL/x', extraktor_version: VERSION, typ: ['quarkus'], knoten: [],
@@ -33,6 +33,51 @@ test('Zusammenführen behält env und die spezifischste Quelle', () => {
       kante('http', 'url:app.partner-a.example.org', { datei: 'application.properties', schluessel: 'partner-a.url' }, 'config', 'PARTNER_A_URL'),
       kante('http', 'url:app.partner-a.example.org', { datei: 'a.java', schluessel: 'literal' }, 'code'),
     ] });
-  assert.equal(umgekehrt.kanten[0].env, 'PARTNER_A_URL');
+  assert.deepEqual(umgekehrt.kanten[0].env, ['PARTNER_A_URL']);
   assert.equal(umgekehrt.kanten[0].quelle, 'config');
+});
+
+import { vereinigeKanten } from '../lib/modell.mjs';
+const rohIst = kanten => ({ repo: 'ITMSL/x', extraktor_version: VERSION, typ: ['b', 'A', 'a'], knoten: ['url:b.example.org', 'Z', 'a'], kanten });
+
+test('Sortierung nach Bytes: Großbuchstaben vor Kleinbuchstaben, unabhängig von der Locale', () => {
+  const ist = kanonisch(rohIst([
+    kante('http', 'env:a', { datei: 'a.java', schluessel: 'k' }),
+    kante('http', 'env:Z', { datei: 'b.java', schluessel: 'k' }),
+    kante('http', 'url:x.example.org', { datei: 'z.java', schluessel: 'k' }),
+    kante('http', 'url:x.example.org', { datei: 'B.java', schluessel: 'k' }),
+    kante('http', 'url:x.example.org', { datei: 'a.java', schluessel: 'z' }),
+    kante('http', 'url:x.example.org', { datei: 'a.java', schluessel: 'Z' }),
+  ]));
+  assert.deepEqual(ist.kanten.map(k => k.ziel), ['env:Z', 'env:a', 'url:x.example.org']);
+  assert.deepEqual(ist.kanten[2].belege.map(b => `${b.datei}#${b.schluessel}`), ['B.java#k', 'a.java#Z', 'a.java#z', 'z.java#k']);
+  assert.deepEqual(ist.typ, ['A', 'a', 'b']);
+  assert.deepEqual(ist.knoten, ['ITMSL/x', 'Z', 'a', 'env:Z', 'env:a', 'url:b.example.org', 'url:x.example.org']);
+  const schluessel = ist.kanten.map(k => `${k.art} ${k.ziel}`);
+  for (let i = 1; i < schluessel.length; i++) assert.ok(schluessel[i - 1] <= schluessel[i], schluessel.join());
+  assert.ok(serialisieren(ist).indexOf('"env:Z"') < serialisieren(ist).indexOf('"env:a"'));
+});
+
+test('env ist eine sortierte Liste distinkter Namen, unabhängig von der Reihenfolge', () => {
+  const a = kante('http', 'url:x.example.org', { datei: 'a', schluessel: 'k' }, 'config', 'B_URL');
+  const b = kante('http', 'url:x.example.org', { datei: 'b', schluessel: 'k' }, 'config', 'A_URL');
+  const c = kante('http', 'url:x.example.org', { datei: 'c', schluessel: 'k' }, 'config', 'A_URL');
+  for (const liste of [[a, b, c], [c, b, a], [b, a, c]]) {
+    const k = kanonisch(rohIst(liste)).kanten;
+    assert.equal(k.length, 1);
+    assert.deepEqual(k[0].env, ['A_URL', 'B_URL']);
+  }
+  assert.deepEqual(vereinigeKanten([a, b])[0].env, ['A_URL', 'B_URL']);
+  assert.deepEqual(a.env, ['B_URL'], 'ein einzelner Name steht ebenfalls als Liste');
+});
+
+test('env: ohne Namen fehlt das Feld, Merge mutiert die Eingabe nicht, Liste aus ist.json wird übernommen', () => {
+  const ohne = kante('http', 'url:x.example.org', { datei: 'a', schluessel: 'k' });
+  const mit = kante('http', 'url:x.example.org', { datei: 'b', schluessel: 'k' }, 'config', 'A_URL');
+  assert.ok(!('env' in ohne));
+  assert.ok(!serialisieren(kanonisch(rohIst([ohne]))).includes('"env"'));
+  vereinigeKanten([mit, kante('http', 'url:x.example.org', { datei: 'c', schluessel: 'k' }, 'config', 'B_URL')]);
+  assert.deepEqual(mit.env, ['A_URL']);
+  const aus = { ...mit, env: ['Z_URL', 'A_URL'] };
+  assert.deepEqual(kanonisch(rohIst([aus])).kanten[0].env, ['A_URL', 'Z_URL']);
 });

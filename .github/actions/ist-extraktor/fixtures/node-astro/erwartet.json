@@ -5,4 +5,4 @@
   "script url:fonts.example.org", "script url:tag.example.org", "script var:script-src",
   "http url:frame.example.org",
   "http host:geo-service:8083", "http host:partner-e:9000", "http url:partner-f.example.org", "http env:PARTNER_G_URL", "http env:PARTNER_I_URL", "smtp env:SMTP_HOST" ],
-  "env": { "http host:geo-service:8083": "GEO_SERVICE_URL", "http host:partner-e:9000": "PARTNER_E_URL", "http url:partner-f.example.org": "PARTNER_F_URL" } }
+  "env": { "http host:geo-service:8083": ["GEO_SERVICE_URL"], "http host:partner-e:9000": ["PARTNER_E_URL"], "http url:partner-f.example.org": ["PARTNER_F_URL"] } }

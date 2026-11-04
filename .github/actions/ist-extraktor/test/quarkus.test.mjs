@@ -12,7 +12,7 @@ test('Typ', () => assert.deepEqual(repoTypen(root), ['quarkus']));
 test('Kantenmenge exakt', () => {
   const { kanten } = extrahiereRoh(root);
   assert.deepEqual(kanten.map(k => `${k.art} ${k.ziel}`).sort(), [...erwartet.kanten].sort());
-  for (const [s, env] of Object.entries(erwartet.env)) assert.equal(kanten.find(k => `${k.art} ${k.ziel}` === s).env, env);
+  for (const [s, env] of Object.entries(erwartet.env)) assert.deepEqual(kanten.find(k => `${k.art} ${k.ziel}` === s).env, env);
 });
 test('keine Zeile und kein Rohliteral in den Kanten', () => {
   const txt = JSON.stringify(extrahiereRoh(root).kanten);
