@@ -29,6 +29,7 @@ test('Quarkus-Erkenner direkt: exakte Treffermenge ohne generische Suche', () =>
     `${J} | http | code | quarkus.rest-client.ohne-property.url | - | - | -`,
     `${P} | http | config | dienst.geo.base-url | - | GEO_SERVICE_URL | -`,
     `${P} | http | config | geo-service.url | - | GEO_SERVICE_URL | -`,
+    `${P} | http | config | partner-e.adresse | https://adresse.partner-e.example.org | - | -`,
     `${P} | http | config | partner-a.url | https://app.partner-a.example.org | PARTNER_A_URL | -`,
     `${P} | http | config | quarkus.rest-client.geo-client.url | - | GEO_SERVICE_URL | -`,
     `${P} | http | config | quarkus.rest-client.partner-b-client.uri | https://preise.partner-b.example.org/json | PARTNER_B_BASE_URL | -`,

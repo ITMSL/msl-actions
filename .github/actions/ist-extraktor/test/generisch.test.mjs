@@ -110,3 +110,40 @@ test('Testdateien (.test.<endung>, .spec.<endung>) werden auf beiden Wegen nicht
     assert.deepEqual(generischeTreffer(dir, textDateien(dir), new Set()).map(t => t.datei).sort(), erwartet);
   });
 });
+
+const treffer = baum => {
+  let r;
+  mitBaum(baum, dir => { r = generischeTreffer(dir, textDateien(dir), new Set()); });
+  return r.map(t => `${t.datei}|${t.schluessel ?? '-'}|${t.rohwert}`);
+};
+
+test('URL-Literale in Konfigurationsdateien ohne url-artigen Schlüssel liefern Treffer', () => {
+  assert.deepEqual(treffer({ 'deploy/nginx/x.conf': 'location / {\n  proxy_pass https://tiles.example.org/;\n}\n' }),
+    ['deploy/nginx/x.conf|-|https://tiles.example.org/']);
+  assert.deepEqual(treffer({ 'config/a.yml': 'ziel: https://y.example.org\n' }), ['config/a.yml|-|https://y.example.org']);
+  assert.deepEqual(treffer({ 'x.properties': 'foo.bar=https://probe.example.org\n' }), ['x.properties|-|https://probe.example.org']);
+  assert.deepEqual(treffer({ 'a.toml': 'ziel = "https://t.example.org/x"\n' }), ['a.toml|-|https://t.example.org/x']);
+});
+
+test('Konfig-Literale: Kommentarzeilen und Workflow-Dateien liefern nichts, %dev./%test. weiterhin nichts', () => {
+  assert.deepEqual(treffer({
+    'a.conf': '# https://kommentar.example.org\n; https://semikolon.example.org\n  // https://doppelt.example.org\n',
+    '.github/workflows/x.yml': 'jobs:\n  b:\n    steps:\n      - run: curl https://ci.example.org\n',
+    'p.properties': '%dev.a.b=https://dev.example.org\n%test.a.b=https://test.example.org\n',
+  }), []);
+});
+
+test('Schlüsselzeile mit derselben URL ergibt genau einen Treffer mit dem Schlüssel, eine abweichende URL im Wert zusätzlich', () => {
+  assert.deepEqual(treffer({ 'x.properties': 'foo.url=https://z.example.org\n' }), ['x.properties|foo.url|https://z.example.org']);
+  assert.deepEqual(treffer({ 'x.env': 'BACKEND_URL="https://e.example.org/p"\n' }), ['x.env|BACKEND_URL|https://e.example.org/p']);
+  assert.deepEqual(treffer({ 'x.properties': 'foo.url=${X_URL:https://a.example.org}\n' }),
+    ['x.properties|foo.url|${X_URL:https://a.example.org}', 'x.properties|-|https://a.example.org']);
+});
+
+test('Workflow-Dateien behalten ihre Schlüsselzeilen', () => {
+  assert.deepEqual(treffer({ '.github/workflows/x.yml': 'env:\n  SFTP_HOST: ${{ secrets.X }}\n' }), ['.github/workflows/x.yml|SFTP_HOST|${{ secrets.X }}']);
+});
+
+test('Konfig-Literal mit Zugangsdaten geht an den Guard (Rohwert enthält die Userinfo)', () => {
+  assert.deepEqual(treffer({ 'x.conf': 'foo https://nutzer:geheimwort1@h.example.org/x;\n' }), ['x.conf|-|https://nutzer:geheimwort1@h.example.org/x']);
+});

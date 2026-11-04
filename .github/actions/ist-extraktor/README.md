@@ -111,7 +111,15 @@ Ausgenommen sind Dokumentation (`docs`, `doc`, `*.md`), `*.xml`, Lockfiles,
 führendem Punkt außer `.github`, sowie `test`, `tests`, `__tests__`,
 `fixtures` und `src/test`. Dateien, deren Name auf `.test.<endung>` oder
 `.spec.<endung>` endet (`a.test.ts`, `x.spec.js`, `y.test.sh`), werden ebenfalls
-nicht gelesen, auch außerhalb dieser Verzeichnisse. Die Liste ist fest und nicht konfigurierbar.
+nicht gelesen, auch außerhalb dieser Verzeichnisse.
+
+URL-Literale (`http://`, `https://`) zählen in allen gelesenen Textdateien, auch in
+Konfigurationsdateien (`.properties`, `.yml`, `.env`, `.toml`, `.cfg`, `.conf`) unter
+beliebigem Schlüssel. Ausgenommen sind Kommentarzeilen (`#`, `;`, `//` am
+Zeilenanfang) in Konfigurationsdateien, `%dev.`- und `%test.`-Zeilen sowie
+Dateien unter `.github/workflows/` (nur deren Schlüsselzeilen zählen; die
+Workflow-Auswertung folgt mit einem eigenen Erkenner). Nennt eine Schlüsselzeile
+dieselbe URL, entsteht eine Kante mit dem Schlüssel als Beleg. Die Liste ist fest und nicht konfigurierbar.
 
 ## Exit-Codes
 

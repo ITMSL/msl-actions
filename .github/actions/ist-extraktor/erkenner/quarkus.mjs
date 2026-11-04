@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { urlLiterale } from '../lib/generisch.mjs';
 
 export const BESITZT = /^(?:[^/]+\/)?src\/main\/resources\/application(?:-[a-z]+)?\.properties$/;
 const PLATZHALTER = /^\$\{([A-Za-z0-9_.\-]+)(?::(.*))?\}(.*)$/;
@@ -38,8 +39,14 @@ const zeileVon = (src, idx) => src.slice(0, idx).split('\n').length;
 export function quarkusTreffer(root, dateien) {
   const map = leseProperties(root, dateien), out = [];
   for (const [k, v] of map) {
-    if (!/(url|uri|host|base-url|endpoint|jdbc\.url|erlaubte-hosts)$/i.test(k)) continue;
     const r = aufloesen(v.wert, map);
+    if (!/(url|uri|host|base-url|endpoint|jdbc\.url|erlaubte-hosts)$/i.test(k)) {
+      // beliebiger Schlüssel: nur ein http(s)-Literal im aufgelösten Wert zählt
+      const w = (r.wert ?? '').trim();
+      for (const u of /^https?:\/\//.test(w) ? [w] : urlLiterale(w))
+        out.push({ datei: v.datei, zeile: v.zeile, schluessel: k, rohwert: u, env: r.env, art: 'http', quelle: 'config' });
+      continue;
+    }
     out.push({ datei: v.datei, zeile: v.zeile, schluessel: k, rohwert: r.wert, env: r.env, art: artAusSchluessel(k), quelle: 'config' });
   }
   for (const d of dateien.filter(d => /\.java$/.test(d) && d.includes('src/main/'))) {

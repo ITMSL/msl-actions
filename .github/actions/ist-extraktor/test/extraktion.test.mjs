@@ -97,7 +97,7 @@ test('extrahiere: erwartet: keine mit Kanten nennt die Anzahl der Kanten', () =>
     writeFileSync(regelDatei(dir), 'erwartet: keine — test\n');
     const r = extrahiere(dir, { repo: 'ITMSL/fixture' });
     assert.deepEqual(r.fehler.map(f => f.code), ['ERWARTET']);
-    assert.match(r.fehler[0].text, /^erwartet: keine, aber 9 Kanten$/);
+    assert.match(r.fehler[0].text, /^erwartet: keine, aber 10 Kanten$/);
   });
 });
 
@@ -293,4 +293,33 @@ test('Userinfo mit Platzhalter oder Dollarzeichen: der ungeschnittene Token geht
       assert.ok(!JSON.stringify(r).includes('12345') && !JSON.stringify(r).includes('nutzer'), zeile);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }
+});
+
+test('Quarkus: http(s)-Literal unter beliebigem Schlüssel, eingebettet, als Platzhalter-Default, mit %prod.-Vorrang und ohne %dev./%test.', () => {
+  mitKopie('quarkus', dir => {
+    const p = path.join(dir, 'src', 'main', 'resources', 'application.properties');
+    writeFileSync(p, readFileSync(p, 'utf8') + [
+      'foo.hinweis=siehe https://eingebettet.example.org/doku.',
+      'bar.ziel=${BAR_ZIEL:https://default.example.org}',
+      'baz.ziel=https://basis.example.org',
+      '%prod.baz.ziel=https://prod.example.org',
+      '%dev.qux.ziel=https://dev.example.org',
+      'kein.ziel=ohne adresse',
+    ].join('\n') + '\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    const ziele = r.ist.kanten.map(k => k.ziel);
+    for (const z of ['url:eingebettet.example.org', 'url:default.example.org', 'url:prod.example.org']) assert.ok(ziele.includes(z), z);
+    for (const z of ['url:basis.example.org', 'url:dev.example.org']) assert.ok(!ziele.includes(z), z);
+    assert.deepEqual(r.ist.kanten.find(k => k.ziel === 'url:default.example.org').env, ['BAR_ZIEL']);
+  });
+});
+
+test('Quarkus: Literal mit Zugangsdaten unter beliebigem Schlüssel wirft SECRET', () => {
+  mitKopie('quarkus', dir => {
+    const p = path.join(dir, 'src', 'main', 'resources', 'application.properties');
+    writeFileSync(p, readFileSync(p, 'utf8') + 'foo.ziel=https://nutzer:geheimwort1@h.example.org/x\n');
+    const r = extrahiere(dir, { repo: 'a/b' });
+    assert.deepEqual(r.fehler.map(f => f.code), ['SECRET']);
+    assert.ok(!JSON.stringify(r).includes('geheimwort1'));
+  });
 });

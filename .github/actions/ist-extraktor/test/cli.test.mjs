@@ -136,7 +136,7 @@ test('erwartet: keine mit Kanten gibt Exit 1 und nennt die Anzahl', () => {
     writeFileSync(regelDatei(dir), 'ignorieren: src/main/java/App.java url:beispiel.example.org — Kommentar, kein Aufruf\nerwartet: keine — test\n');
     const r = lauf(['check', dir, '--repo', 'ITMSL/fixture']);
     assert.equal(r.code, 1);
-    assert.match(r.err + r.out, /erwartet: keine, aber 8 Kanten/);
+    assert.match(r.err + r.out, /erwartet: keine, aber 9 Kanten/);
   });
 });
 
