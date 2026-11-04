@@ -4,7 +4,8 @@ import path from 'node:path';
 
 export const AUSSCHLUSS_VERZ = new Set(['node_modules', 'target', 'dist', 'build', 'coverage', 'docs', 'doc', 'test', 'tests', '__tests__', 'fixtures']);
 const TEXT = /\.(java|kt|properties|ya?ml|json|mjs|cjs|js|ts|tsx|astro|html|sh|py|php|env|toml|cfg|conf)$/i;
-const LOCKFILE = /(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|composer\.lock)$/;
+const TESTDATEI = /\.(test|spec)\.[^./]+$/i;
+const LOCKFILE =/(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|composer\.lock)$/;
 
 function verzeichnisErlaubt(name) {
   return !AUSSCHLUSS_VERZ.has(name) && !(name.startsWith('.') && name !== '.github');
@@ -12,7 +13,7 @@ function verzeichnisErlaubt(name) {
 
 function erlaubt(rel) {
   const teile = rel.split('/');
-  return teile.slice(0, -1).every(verzeichnisErlaubt) && !rel.startsWith('src/test/') && TEXT.test(teile.at(-1)) && !LOCKFILE.test(rel);
+  return teile.slice(0, -1).every(verzeichnisErlaubt) && !rel.startsWith('src/test/') && TEXT.test(teile.at(-1)) && !TESTDATEI.test(teile.at(-1)) && !LOCKFILE.test(rel);
 }
 
 function kandidaten(root) {

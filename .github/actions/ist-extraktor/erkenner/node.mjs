@@ -6,7 +6,7 @@ const QUELLE = /\.(ts|tsx|js|mjs|cjs|astro)$/;
 
 export function nodeTreffer(root, dateien) {
   const out = [];
-  for (const d of dateien.filter(d => QUELLE.test(d) && !/\.test\./.test(d))) {
+  for (const d of dateien.filter(d => QUELLE.test(d))) {
     const src = readFileSync(path.join(root, d), 'utf8'), z = i => src.slice(0, i).split('\n').length;
     const envVon = new Map();
     for (const m of src.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*(?:import\.meta\.env|process\.env)\.([A-Z0-9_]+)/g)) envVon.set(m[1], m[2]);

@@ -109,7 +109,9 @@ Der Extraktor liest nur git-getrackte Dateien (ohne `.git` den Dateibaum).
 Ausgenommen sind Dokumentation (`docs`, `doc`, `*.md`), `*.xml`, Lockfiles,
 `node_modules`, `target`, `dist`, `build`, `coverage`, Verzeichnisse mit
 führendem Punkt außer `.github`, sowie `test`, `tests`, `__tests__`,
-`fixtures` und `src/test`. Die Liste ist fest und nicht konfigurierbar.
+`fixtures` und `src/test`. Dateien, deren Name auf `.test.<endung>` oder
+`.spec.<endung>` endet (`a.test.ts`, `x.spec.js`, `y.test.sh`), werden ebenfalls
+nicht gelesen, auch außerhalb dieser Verzeichnisse. Die Liste ist fest und nicht konfigurierbar.
 
 ## Exit-Codes
 

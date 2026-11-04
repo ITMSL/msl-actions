@@ -95,3 +95,18 @@ test('URL mit $ im Query wird wie bisher vor dem $ geschnitten, mit @ nach dem $
     ]);
   });
 });
+
+test('Testdateien (.test.<endung>, .spec.<endung>) werden auf beiden Wegen nicht gelesen, ähnliche Namen schon', () => {
+  const url = 'https://x.example.org/p\n';
+  const baum = { 'src/a.test.ts': url, 'src/a.spec.ts': url, 'scripts/x.test.sh': url, 'src/b.spec.test.js': url,
+    'src/test-helfer.ts': url, 'src/latest.ts': url, 'src/spec.ts': url, 'src/test.ts': url };
+  const erwartet = ['src/latest.ts', 'src/spec.ts', 'src/test-helfer.ts', 'src/test.ts'];
+  mitBaum(baum, dir => {
+    assert.deepEqual(textDateien(dir), erwartet);
+    assert.deepEqual(generischeTreffer(dir, textDateien(dir), new Set()).map(t => t.datei).sort(), erwartet);
+    execFileSync('git', ['init', '-q', dir]);
+    execFileSync('git', ['-C', dir, 'add', '.']);
+    assert.deepEqual(textDateien(dir), erwartet);
+    assert.deepEqual(generischeTreffer(dir, textDateien(dir), new Set()).map(t => t.datei).sort(), erwartet);
+  });
+});
